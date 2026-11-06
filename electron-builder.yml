@@ -1,0 +1,21 @@
+appId: fr.cronix.deskassistant
+productName: Desk Assistant
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+extraResources:
+  - from: helper/LoopbackMixer.cs
+    to: LoopbackMixer.cs
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  artifactName: DeskAssistant-Setup-${version}.exe
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false

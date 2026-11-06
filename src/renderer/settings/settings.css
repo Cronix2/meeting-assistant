@@ -1,0 +1,274 @@
+:root {
+  --bg: #14161b;
+  --panel: #1b1e25;
+  --line: #2a2f3a;
+  --text: #e8eaee;
+  --muted: #8b93a3;
+  --accent: #3b82f6;
+  --ok: #22c55e;
+  --err: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 'Segoe UI', system-ui, sans-serif;
+}
+
+form {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 20px 24px 90px;
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0 0 16px;
+}
+
+h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+section {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+label.inline {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--text);
+  font-size: 13.5px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 14px;
+}
+
+input:not([type='checkbox']),
+select,
+textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 9px;
+  color: var(--text);
+  background: #0f1115;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font: inherit;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+textarea {
+  resize: vertical;
+  font-family: Consolas, 'Cascadia Mono', monospace;
+  font-size: 13px;
+}
+
+input.hotkey {
+  cursor: pointer;
+  text-align: center;
+  font-family: Consolas, monospace;
+}
+input.hotkey:focus {
+  border-color: var(--accent);
+  background: #131a2a;
+}
+
+.note {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin: 0 0 10px;
+}
+.warn {
+  color: #f59e0b;
+  font-size: 12.5px;
+}
+
+footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 24px;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+
+#result {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 480px;
+  text-align: right;
+}
+#result.ok {
+  color: var(--ok);
+}
+#result.err {
+  color: var(--err);
+}
+
+button {
+  font: inherit;
+  color: #fff;
+  background: var(--accent);
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 18px;
+  cursor: pointer;
+}
+button:hover {
+  filter: brightness(1.1);
+}
+button.secondary {
+  margin-left: 8px;
+  padding: 3px 10px;
+  font-size: 12px;
+  background: #2a2f3a;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---------- Diagnostic ---------- */
+.diagrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.pill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #2a2f3a;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.pill.ok {
+  background: #14351f;
+  color: var(--ok);
+}
+.pill.err {
+  background: #3a1717;
+  color: var(--err);
+}
+.pill.wait {
+  background: #3a2e12;
+  color: #f59e0b;
+}
+.diagrow button.secondary {
+  margin-left: auto;
+}
+.meter {
+  display: grid;
+  grid-template-columns: minmax(120px, 38%) 1fr 64px;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.meter .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.meter .bar {
+  height: 8px;
+  background: #0f1115;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.meter .bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--ok);
+  transition: width 0.12s linear;
+}
+.meter .db {
+  text-align: right;
+  color: var(--muted);
+  font-family: Consolas, monospace;
+}
+#logBox {
+  height: 150px;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  overflow: auto;
+  background: #0f1115;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--muted);
+  font: 12px/1.4 Consolas, 'Cascadia Mono', monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+#mixerList label.inline {
+  margin-bottom: 4px;
+}
+.tag {
+  color: var(--accent);
+  font-size: 11.5px;
+  margin-left: 6px;
+}
+
+/* ---------- Mémoire ---------- */
+.ragrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.ragrow .rname {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ragrow .rmeta {
+  color: var(--muted);
+  font-size: 12px;
+}
+.ragrow button.secondary {
+  margin-left: 0;
+}

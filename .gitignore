@@ -1,0 +1,14 @@
+node_modules/
+out/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+*.zip
+helper/*.exe
+# Données locales de l'appli (elles vivent dans %APPDATA%, jamais dans le dépôt)
+secrets.json
+settings.json
+rag.json
+.DS_Store

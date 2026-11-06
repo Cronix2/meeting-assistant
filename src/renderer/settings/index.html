@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Desk Assistant — Réglages</title>
+    <link rel="stylesheet" href="./settings.css" />
+  </head>
+  <body>
+    <form id="form" autocomplete="off">
+      <h1>Réglages</h1>
+
+      <section id="diag">
+        <h2>Diagnostic en direct</h2>
+        <div class="diagrow">
+          <span class="pill" id="dgListen">Écoute : …</span>
+          <span class="pill" id="dgCapture">Capture : …</span>
+          <span class="pill" id="dgStt">Transcription : …</span>
+          <button type="button" id="dgToggle" class="secondary">Démarrer l'écoute</button>
+        </div>
+        <p id="dgMessage" class="warn" hidden></p>
+        <div id="meters"></div>
+        <p class="note" id="dgCounters"></p>
+        <p class="warn" id="dgHint" hidden></p>
+        <pre id="logBox"></pre>
+      </section>
+
+      <section>
+        <h2>Clés API</h2>
+        <p class="note">
+          Chiffrées sur ton PC (DPAPI via Electron safeStorage) et jamais envoyées au renderer.
+          Laisse vide pour conserver la clé actuelle.
+        </p>
+        <label>
+          Clé ElevenLabs
+          <input id="elevenLabsKey" type="password" spellcheck="false" />
+        </label>
+        <label class="inline"><input id="clearEleven" type="checkbox" /> Effacer la clé ElevenLabs</label>
+        <label>
+          Clé Claude (Anthropic)
+          <input id="anthropicKey" type="password" spellcheck="false" />
+        </label>
+        <label class="inline"><input id="clearAnthropic" type="checkbox" /> Effacer la clé Claude</label>
+        <p id="encWarn" class="warn" hidden>
+          Le chiffrement des clés n'est pas disponible sur cette machine : les clés ne peuvent pas être
+          enregistrées (utilise les variables d'environnement ELEVENLABS_API_KEY / ANTHROPIC_API_KEY).
+        </p>
+      </section>
+
+      <section>
+        <h2>Écoute et transcription</h2>
+        <label>
+          Source audio
+          <select id="audioSource">
+            <option value="loopback">Sortie système — loopback de la sortie par défaut de Windows</option>
+          </select>
+        </label>
+        <p class="note">
+          Le loopback ne capte que la sortie audio <b>par défaut</b> de Windows. Avec SteelSeries Sonar (ou
+          plusieurs sorties), choisis <b>Mixeur de sorties Windows</b> : il écoute chaque canal en même temps,
+          sans activer le mode Streamer. Tu peux aussi choisir un périphérique d'entrée.
+          <button type="button" id="refreshDevices" class="secondary">Actualiser la liste</button>
+        </p>
+        <div id="mixerBox" hidden>
+          <label class="inline">
+            <input id="mixerAutoSonar" type="checkbox" /> Détecter automatiquement les canaux SteelSeries Sonar
+            (Game, Chat, Média, Aux…)
+          </label>
+          <p class="note">
+            Sorties Windows écoutées (coche aussi une sortie physique si besoin) :
+            <button type="button" id="refreshMixer" class="secondary">Actualiser</button>
+          </p>
+          <div id="mixerList"></div>
+          <p class="note" id="mixerNote"></p>
+        </div>
+        <div class="grid">
+          <label>
+            Langue parlée
+            <select id="sttLanguage">
+              <option value="auto">Détection automatique (FR / EN)</option>
+              <option value="fr">Français</option>
+              <option value="en">Anglais</option>
+            </select>
+          </label>
+          <label>
+            Silence pour valider une phrase (s)
+            <input id="vadSilenceSecs" type="number" min="0.3" max="3" step="0.1" />
+          </label>
+        </div>
+        <label class="inline">
+          <input id="silenceGate" type="checkbox" /> Ne transcrire que quand il y a du son (réduit le temps
+          d'audio facturé)
+        </label>
+        <label>
+          Seuil de détection du son (RMS, 0.0005 – 0.1)
+          <input id="gateThreshold" type="number" min="0.0005" max="0.1" step="0.0005" />
+        </label>
+        <label class="inline"><input id="autoListen" type="checkbox" /> Écouter dès le lancement</label>
+      </section>
+
+      <section>
+        <h2>Claude</h2>
+        <div class="grid">
+          <label>
+            Modèle
+            <input id="model" list="models" spellcheck="false" />
+            <datalist id="models">
+              <option value="claude-haiku-5-5"></option>
+              <option value="claude-sonnet-5-5"></option>
+              <option value="claude-opus-5-5"></option>
+            </datalist>
+          </label>
+          <label>
+            Langue des réponses
+            <select id="replyLanguage">
+              <option value="auto">Comme la conversation</option>
+              <option value="fr">Toujours en français</option>
+              <option value="en">Toujours en anglais</option>
+            </select>
+          </label>
+          <label>
+            Longueur max (tokens)
+            <input id="maxTokens" type="number" min="50" max="4000" step="50" />
+          </label>
+        </div>
+        <label>
+          Contexte de la session en cours (optionnel — à changer selon ce que tu fais)
+          <textarea
+            id="sessionContext"
+            rows="3"
+            spellcheck="false"
+            placeholder="Ex. : Exercice d'anglais en mise en situation : je joue un touriste australien qui visite la France, l'interlocuteur de la vidéo me pose des questions."
+          ></textarea>
+        </label>
+        <label class="inline">
+          <input id="numbersInWords" type="checkbox" /> Écrire les nombres, dates et heures en toutes lettres
+        </label>
+        <label>
+          Preset de prompt
+          <select id="preset"></select>
+        </label>
+        <label>
+          Prompt système
+          <textarea id="systemPrompt" rows="8" spellcheck="false"></textarea>
+        </label>
+      </section>
+
+      <section>
+        <h2>Mémoire personnelle</h2>
+        <p class="note">
+          Pour que les réponses parlent de <b>toi</b> (poste, projets, parcours…). À chaque demande, ton profil
+          et les extraits de tes documents les plus proches de la conversation sont ajoutés au message envoyé à
+          Claude. Les documents restent stockés sur ce PC ; seul ce qui est retenu part avec la requête.
+        </p>
+        <label class="inline"><input id="ragEnabled" type="checkbox" /> Utiliser la mémoire dans les réponses</label>
+        <label>
+          Profil permanent (toujours transmis)
+          <textarea
+            id="ragProfile"
+            rows="7"
+            spellcheck="false"
+            placeholder="Ex. : Je m'appelle … Je suis alternant en cybersécurité chez … Mon objectif : … Mes projets : … Ma façon de répondre : tutoiement, phrases courtes…"
+          ></textarea>
+        </label>
+        <div class="grid">
+          <label>
+            Extraits de documents par demande (1 – 10)
+            <input id="ragTopK" type="number" min="1" max="10" step="1" />
+          </label>
+        </div>
+        <p class="note">
+          Documents (.txt, .md, .json, .csv… ; CV, notes, fiches projet — exporte les PDF/Word en texte) :
+          <button type="button" id="ragAdd" class="secondary">Ajouter des fichiers…</button>
+        </p>
+        <div id="ragList"></div>
+        <p class="note" id="ragNote"></p>
+      </section>
+
+      <section>
+        <h2>Déclenchement</h2>
+        <div class="grid">
+          <label>
+            Mode
+            <select id="mode">
+              <option value="manual">Manuel — réponse au raccourci</option>
+              <option value="auto">Automatique — à chaque fin de phrase</option>
+            </select>
+          </label>
+          <label>
+            Mémoire de la conversation envoyée à Claude (minutes)
+            <input id="bufferMinutes" type="number" min="0.5" max="30" step="0.5" />
+          </label>
+          <label>
+            Délai avant réponse auto (ms)
+            <input id="autoDebounceMs" type="number" min="0" max="10000" step="100" />
+          </label>
+          <label>
+            Intervalle minimum entre 2 réponses auto (ms)
+            <input id="autoMinGapMs" type="number" min="0" max="60000" step="500" />
+          </label>
+        </div>
+        <label class="inline">
+          <input id="autoEarly" type="checkbox" /> En mode auto, répondre dès que la question est reconnue, sans
+          attendre la fin de la validation de la phrase (réponse plus rapide)
+        </label>
+        <label class="inline">
+          <input id="autoOnlyQuestions" type="checkbox" /> En mode auto, ne répondre qu'aux questions
+          (économise les appels)
+        </label>
+      </section>
+
+      <section>
+        <h2>Raccourcis clavier</h2>
+        <p class="note">Clique dans un champ puis appuie sur la combinaison (au moins une touche Ctrl / Alt / Maj / Win).</p>
+        <div class="grid">
+          <label>Afficher / masquer <input id="hkToggle" class="hotkey" readonly /></label>
+          <label>Demander une réponse <input id="hkAsk" class="hotkey" readonly /></label>
+          <label>Vider transcription et réponse <input id="hkClear" class="hotkey" readonly /></label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Fenêtre</h2>
+        <div class="grid">
+          <label>
+            Opacité (0.3 – 1)
+            <input id="opacity" type="number" min="0.3" max="1" step="0.05" />
+          </label>
+          <label>
+            Taille du texte (px)
+            <input id="fontSize" type="number" min="10" max="28" step="1" />
+          </label>
+        </div>
+        <label class="inline">
+          <input id="showTranscript" type="checkbox" /> Afficher la transcription en direct sous la réponse
+        </label>
+        <label class="inline">
+          <input id="contentProtection" type="checkbox" /> Masquer la fenêtre dans les captures et partages d'écran
+        </label>
+        <label class="inline"><input id="startHidden" type="checkbox" /> Démarrer avec la fenêtre masquée</label>
+        <label class="inline"><input id="launchAtStartup" type="checkbox" /> Lancer au démarrage de Windows (version installée)</label>
+      </section>
+
+      <footer>
+        <span id="result"></span>
+        <button type="submit" id="save">Enregistrer</button>
+      </footer>
+    </form>
+    <script type="module" src="./settings.ts"></script>
+  </body>
+</html>

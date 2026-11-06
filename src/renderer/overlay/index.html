@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Desk Assistant</title>
+    <link rel="stylesheet" href="./overlay.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header id="bar">
+        <span id="dot" class="dot"></span>
+        <span id="status">Démarrage…</span>
+        <span class="spacer"></span>
+        <span id="perf" class="level" title="Délai avant le premier mot de la réponse"></span>
+        <span id="level" class="level" title="Niveau audio capté · morceaux reçus par le process principal">♪ –</span>
+        <button id="mode" class="pill" title="Basculer manuel / automatique">manuel</button>
+        <button id="ask" title="Demander une réponse maintenant">⚡</button>
+        <button id="listen" title="Pause / reprise de l'écoute">⏸</button>
+        <button id="settings" title="Réglages">⚙</button>
+        <button id="close" title="Masquer (l'écoute continue)">✕</button>
+      </header>
+      <main id="answer"></main>
+      <footer id="live"></footer>
+    </div>
+    <script type="module" src="./overlay.ts"></script>
+  </body>
+</html>
