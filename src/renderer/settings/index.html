@@ -12,316 +12,563 @@
   </head>
   <body>
     <form id="form" autocomplete="off">
-      <h1>Réglages</h1>
-
-      <section id="diag">
-        <h2>Diagnostic en direct</h2>
-        <div class="diagrow">
-          <span class="pill" id="dgListen">Écoute : …</span>
-          <span class="pill" id="dgCapture">Capture : …</span>
-          <span class="pill" id="dgStt">Transcription : …</span>
-          <button type="button" id="dgToggle" class="secondary">Démarrer l'écoute</button>
+      <nav id="side" aria-label="Sections des réglages">
+        <div class="brand">
+          <span class="logo" aria-hidden="true"></span>
+          <span>Desk Assistant</span>
         </div>
-        <p id="dgMessage" class="warn" hidden></p>
-        <div id="meters"></div>
-        <p class="note" id="dgCounters"></p>
-        <p class="warn" id="dgHint" hidden></p>
-        <pre id="logBox"></pre>
-      </section>
+        <a href="#accueil" data-nav="accueil">Accueil</a>
+        <a href="#cles" data-nav="cles">Clés API <i class="dot" id="navKeys"></i></a>
+        <a href="#ecoute" data-nav="ecoute">Écoute</a>
+        <a href="#reponses" data-nav="reponses">Réponses</a>
+        <a href="#moi" data-nav="moi">Mon profil</a>
+        <a href="#pro" data-nav="pro">Documents de travail</a>
+        <a href="#fenetre" data-nav="fenetre">Fenêtre et raccourcis</a>
+        <a href="#diag" data-nav="diag">Diagnostic <i class="dot" id="navDiag"></i></a>
+        <button type="button" id="tourStart" class="tour-btn">Visite guidée</button>
+      </nav>
 
-      <section>
-        <h2>Clés API</h2>
-        <p class="note">
-          Chiffrées sur ton PC (DPAPI via Electron safeStorage) et jamais envoyées au renderer.
-          Laisse vide pour conserver la clé actuelle.
-        </p>
-        <label>
-          Clé ElevenLabs
-          <input id="elevenLabsKey" type="password" spellcheck="false" />
-        </label>
-        <label class="inline"><input id="clearEleven" type="checkbox" /> Effacer la clé ElevenLabs</label>
-        <label>
-          Clé Claude (Anthropic)
-          <input id="anthropicKey" type="password" spellcheck="false" />
-        </label>
-        <label class="inline"><input id="clearAnthropic" type="checkbox" /> Effacer la clé Claude</label>
-        <p id="encWarn" class="warn" hidden>
-          Le chiffrement des clés n'est pas disponible sur cette machine : les clés ne peuvent pas être
-          enregistrées (utilise les variables d'environnement ELEVENLABS_API_KEY / ANTHROPIC_API_KEY).
-        </p>
-      </section>
+      <main id="pages">
+        <!-- ============ Accueil ============ -->
+        <section class="page" id="page-accueil" data-page="accueil">
+          <header class="page-head">
+            <h1>Bienvenue</h1>
+            <p>
+              Desk Assistant écoute le son de ton PC (appel, visio, vidéo), le transcrit et te propose quoi répondre
+              dans une petite fenêtre. Trois étapes suffisent pour démarrer.
+            </p>
+          </header>
 
-      <section>
-        <h2>Écoute et transcription</h2>
-        <label>
-          Source audio
-          <select id="audioSource">
-            <option value="loopback">Sortie système — loopback de la sortie par défaut de Windows</option>
-          </select>
-        </label>
-        <p class="note">
-          Le loopback ne capte que la sortie audio <b>par défaut</b> de Windows. Avec SteelSeries Sonar (ou
-          plusieurs sorties), choisis <b>Mixeur de sorties Windows</b> : il écoute chaque canal en même temps,
-          sans activer le mode Streamer. Tu peux aussi choisir un périphérique d'entrée.
-          <button type="button" id="refreshDevices" class="secondary">Actualiser la liste</button>
-        </p>
-        <div id="mixerBox" hidden>
-          <label class="inline">
-            <input id="mixerAutoSonar" type="checkbox" /> Détecter automatiquement les canaux SteelSeries Sonar
-            (Game, Chat, Média, Aux…)
-          </label>
-          <p class="note">
-            Sorties Windows écoutées (coche aussi une sortie physique si besoin) :
-            <button type="button" id="refreshMixer" class="secondary">Actualiser</button>
+          <ol class="steps" id="setupSteps">
+            <li id="stepKeys">
+              <div>
+                <b>Ajoute tes deux clés API</b>
+                <span class="hint">Une pour la transcription (ElevenLabs), une pour les réponses (Claude).</span>
+              </div>
+              <a class="go" href="#cles">Ouvrir</a>
+            </li>
+            <li id="stepAudio">
+              <div>
+                <b>Vérifie que le son arrive</b>
+                <span class="hint">Lance une vidéo : une barre doit bouger dans le Diagnostic.</span>
+              </div>
+              <a class="go" href="#diag">Tester</a>
+            </li>
+            <li id="stepContext">
+              <div>
+                <b>Dis à l'assistant ce que tu fais</b>
+                <span class="hint">Entretien, réunion, cours… et quelques lignes sur toi.</span>
+              </div>
+              <a class="go" href="#reponses">Préciser</a>
+            </li>
+          </ol>
+
+          <div class="tour-card">
+            <div>
+              <b>Première fois ici ?</b>
+              <p>La visite guidée montre chaque réglage, à quoi il sert et quoi y mettre, avec des exemples.</p>
+            </div>
+            <button type="button" id="tourStart2">Lancer la visite</button>
+          </div>
+
+          <h2 class="sub">Pendant un appel</h2>
+          <dl class="cheats">
+            <dt><kbd id="cheatToggle">Ctrl+Alt+Space</kbd></dt>
+            <dd>afficher ou masquer la fenêtre de réponse</dd>
+            <dt><kbd id="cheatAsk">Ctrl+Alt+Enter</kbd></dt>
+            <dd>demander une réponse à Claude</dd>
+            <dt><kbd id="cheatClear">Ctrl+Alt+Backspace</kbd></dt>
+            <dd>repartir de zéro (efface la conversation)</dd>
+          </dl>
+        </section>
+
+        <!-- ============ Clés ============ -->
+        <section class="page" id="page-cles" data-page="cles" hidden>
+          <header class="page-head">
+            <h1>Clés API</h1>
+            <p>
+              Elles restent chiffrées sur ce PC. Pour changer une clé, colle la nouvelle ; laisse vide pour garder
+              l'actuelle.
+            </p>
+          </header>
+
+          <div class="field" data-help="elevenLabsKey">
+            <label for="elevenLabsKey">Clé ElevenLabs <span class="status" id="elevenStatus"></span></label>
+            <p class="hint">
+              Sert à transcrire l'audio.
+              <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank">Créer une clé</a>
+            </p>
+            <input id="elevenLabsKey" type="password" spellcheck="false" />
+            <label class="mini"><input id="clearEleven" type="checkbox" /> Supprimer cette clé à l'enregistrement</label>
+          </div>
+
+          <div class="field" data-help="anthropicKey">
+            <label for="anthropicKey">Clé Claude (Anthropic) <span class="status" id="claudeStatus"></span></label>
+            <p class="hint">
+              Sert à écrire les réponses.
+              <a href="https://console.anthropic.com/settings/keys" target="_blank">Créer une clé</a>
+            </p>
+            <input id="anthropicKey" type="password" spellcheck="false" />
+            <label class="mini"><input id="clearAnthropic" type="checkbox" /> Supprimer cette clé à l'enregistrement</label>
+          </div>
+
+          <p id="encWarn" class="callout warn" hidden>
+            Le chiffrement n'est pas disponible sur cette machine : les clés ne peuvent pas être enregistrées. Utilise
+            les variables d'environnement ELEVENLABS_API_KEY et ANTHROPIC_API_KEY.
           </p>
-          <div id="mixerList"></div>
-          <p class="note" id="mixerNote"></p>
-        </div>
-        <div class="grid">
-          <label>
-            Langue parlée
-            <select id="sttLanguage">
-              <option value="auto">Détection automatique (FR / EN)</option>
-              <option value="fr">Français</option>
-              <option value="en">Anglais</option>
+        </section>
+
+        <!-- ============ Écoute ============ -->
+        <section class="page" id="page-ecoute" data-page="ecoute" hidden>
+          <header class="page-head">
+            <h1>Écoute</h1>
+            <p>Quel son écouter, et comment le découper en phrases. Ton micro n'est jamais écouté.</p>
+          </header>
+
+          <div class="field" data-help="audioSource">
+            <label for="audioSource">Son à écouter</label>
+            <p class="hint">
+              Avec un casque SteelSeries Sonar ou plusieurs sorties audio, choisis « Toutes les sorties (mixeur) ».
+              <button type="button" id="refreshDevices" class="link">Actualiser la liste</button>
+            </p>
+            <select id="audioSource">
+              <option value="loopback">Sortie par défaut de Windows</option>
             </select>
-          </label>
-          <label>
-            Silence pour valider une phrase (s)
-            <input id="vadSilenceSecs" type="number" min="0.3" max="3" step="0.1" />
-          </label>
-        </div>
-        <label class="inline">
-          <input id="silenceGate" type="checkbox" /> Ne transcrire que quand il y a du son (réduit le temps
-          d'audio facturé)
-        </label>
-        <label>
-          Seuil de détection du son (RMS, 0.0005 – 0.1)
-          <input id="gateThreshold" type="number" min="0.0005" max="0.1" step="0.0005" />
-        </label>
-        <label class="inline"><input id="autoListen" type="checkbox" /> Écouter dès le lancement</label>
-      </section>
+          </div>
 
-      <section>
-        <h2>Claude</h2>
-        <div class="grid">
-          <label>
-            Modèle
-            <input id="model" list="models" spellcheck="false" />
-            <datalist id="models">
-              <option value="claude-haiku-5-5"></option>
-              <option value="claude-sonnet-5-5"></option>
-              <option value="claude-opus-5-5"></option>
-            </datalist>
-          </label>
-          <label>
-            Langue des réponses
-            <select id="replyLanguage">
-              <option value="auto">Comme la conversation</option>
-              <option value="fr">Toujours en français</option>
-              <option value="en">Toujours en anglais</option>
-            </select>
-          </label>
-          <label>
-            Longueur max (tokens)
-            <input id="maxTokens" type="number" min="50" max="4000" step="50" />
-          </label>
-        </div>
-        <label>
-          Contexte de la session en cours (optionnel — à changer selon ce que tu fais)
-          <textarea
-            id="sessionContext"
-            rows="3"
-            spellcheck="false"
-            placeholder="Ex. : Exercice d'anglais en mise en situation : je joue un touriste australien qui visite la France, l'interlocuteur de la vidéo me pose des questions."
-          ></textarea>
-        </label>
-        <label class="inline">
-          <input id="numbersInWords" type="checkbox" /> Écrire les nombres, dates et heures en toutes lettres
-        </label>
-        <label>
-          Preset de prompt
-          <select id="preset"></select>
-        </label>
-        <label>
-          Prompt système
-          <textarea id="systemPrompt" rows="8" spellcheck="false"></textarea>
-        </label>
-      </section>
+          <div id="mixerBox" class="subpanel" hidden>
+            <label class="switch">
+              <input id="mixerAutoSonar" type="checkbox" />
+              <span>Trouver automatiquement les canaux Sonar (Game, Chat, Média, Aux)</span>
+            </label>
+            <p class="hint">
+              Sorties écoutées : coche aussi la sortie de ton casque si rien ne bouge dans le Diagnostic.
+              <button type="button" id="refreshMixer" class="link">Actualiser</button>
+            </p>
+            <div id="mixerList"></div>
+            <p class="hint" id="mixerNote"></p>
+          </div>
 
-      <section>
-        <h2>Mémoire personnelle</h2>
-        <p class="note">
-          Pour que les réponses parlent de <b>toi</b> (poste, projets, parcours…). À chaque demande, ton profil
-          et les extraits de tes documents les plus proches de la conversation sont ajoutés au message envoyé à
-          Claude. Les documents restent stockés sur ce PC ; seul ce qui est retenu part avec la requête.
-        </p>
-        <label class="inline"><input id="ragEnabled" type="checkbox" /> Utiliser la mémoire dans les réponses</label>
-        <label>
-          Profil permanent (toujours transmis)
-          <textarea
-            id="ragProfile"
-            rows="7"
-            spellcheck="false"
-            placeholder="Ex. : Je m'appelle … Je suis alternant en cybersécurité chez … Mon objectif : … Mes projets : … Ma façon de répondre : tutoiement, phrases courtes…"
-          ></textarea>
-        </label>
-        <div class="grid">
-          <label>
-            Extraits de documents par demande (1 – 10)
-            <input id="ragTopK" type="number" min="1" max="10" step="1" />
-          </label>
-        </div>
-        <p class="note">
-          Documents (.txt, .md, .json, .csv… ; CV, notes, fiches projet — exporte les PDF/Word en texte) :
-          <button type="button" id="ragAdd" class="secondary">Ajouter des fichiers…</button>
-        </p>
-        <div id="ragList"></div>
-        <p class="note" id="ragNote"></p>
-      </section>
+          <div class="row2">
+            <div class="field" data-help="sttLanguage">
+              <label for="sttLanguage">Langue parlée</label>
+              <select id="sttLanguage">
+                <option value="auto">Détecter (français ou anglais)</option>
+                <option value="fr">Français</option>
+                <option value="en">Anglais</option>
+              </select>
+            </div>
 
-      <section id="kbSection">
-        <h2>Mémoire professionnelle (bases de connaissances)</h2>
-        <p class="note">
-          Pour les sujets de travail : un <b>projet de code</b>, des cours, des textes de loi, des PDF, des notes…
-          Crée une base, ajoute-y des <b>fichiers ou des dossiers entiers</b> (code, PDF, Word, PowerPoint, Markdown,
-          texte, notebooks, HTML…). Tout est lu et indexé <b>sur ce PC</b>, même pour de gros volumes. À chaque demande,
-          les extraits les plus proches de la conversation sont retrouvés et ajoutés au message envoyé à Claude, avec
-          la <b>fiche de compréhension</b> de la base (ci-dessous) : c'est ce qui permet de répondre à
-          « pourquoi tu as fait cette fonction comme ça ? ».
-        </p>
-        <label class="inline"><input id="kbEnabled" type="checkbox" /> Utiliser les bases de connaissances dans les réponses</label>
-        <label class="inline">
-          <input id="kbAutoSummary" type="checkbox" /> Résumer chaque fichier avec Claude à l'import (une « note » par fichier : rôle,
-          éléments, choix, mots-clés — elle permet de retrouver le bon fichier même si la question n'emploie pas ses mots)
-        </label>
-        <div class="grid">
-          <label>
-            Passages de fichiers par demande (1 – 20)
-            <input id="kbTopK" type="number" min="1" max="20" step="1" />
-          </label>
-          <label>
-            Taille max des extraits (caractères)
-            <input id="kbBudgetChars" type="number" min="2000" max="40000" step="1000" />
-          </label>
-        </div>
-        <div class="kbbar">
-          <select id="kbSelect"></select>
-          <button type="button" id="kbDelete" class="secondary">Supprimer</button>
-        </div>
-        <div class="kbbar">
-          <input id="kbName" type="text" maxlength="80" placeholder="Nom : « Projet DNS Relay », « Code du travail », « Cours crypto »…" />
-          <button type="button" id="kbNew" class="secondary">Créer une base</button>
-          <button type="button" id="kbRename" class="secondary">Renommer la base choisie</button>
-        </div>
-        <div id="kbBody" hidden>
-          <label class="inline"><input id="kbActive" type="checkbox" /> Base active</label>
-          <label>
-            Présentation (toujours transmise) — dis qui tu es par rapport à ce contenu
+            <div class="field" data-help="vadSilenceSecs">
+              <label for="vadSilenceSecs">Fin de phrase après <output id="vadOut"></output></label>
+              <input id="vadSilenceSecs" type="range" min="0.3" max="3" step="0.1" />
+              <div class="scale"><span>réactif</span><span>patient</span></div>
+            </div>
+          </div>
+
+          <div class="field" data-help="autoListen">
+            <label class="switch"><input id="autoListen" type="checkbox" /><span>Écouter dès le lancement de l'appli</span></label>
+          </div>
+
+          <details class="advanced">
+            <summary>Réglages avancés</summary>
+            <div class="field" data-help="silenceGate">
+              <label class="switch">
+                <input id="silenceGate" type="checkbox" />
+                <span>N'envoyer l'audio que quand il y a du son</span>
+              </label>
+              <p class="hint">Réduit le temps d'audio facturé par ElevenLabs.</p>
+            </div>
+            <div class="field" data-help="gateThreshold">
+              <label for="gateThreshold">Sensibilité au son <output id="gateOut"></output></label>
+              <input id="gateThreshold" type="range" min="0.0005" max="0.05" step="0.0005" />
+              <div class="scale"><span>capte les sons faibles</span><span>ignore les bruits de fond</span></div>
+            </div>
+          </details>
+        </section>
+
+        <!-- ============ Réponses ============ -->
+        <section class="page" id="page-reponses" data-page="reponses" hidden>
+          <header class="page-head">
+            <h1>Réponses</h1>
+            <p>Ce que l'assistant doit savoir de la situation, et quand il répond.</p>
+          </header>
+
+          <div class="field" data-help="preset">
+            <label for="preset">Type de situation</label>
+            <p class="hint">Choisis le cas le plus proche ; tu pourras affiner les instructions plus bas.</p>
+            <select id="preset"></select>
+          </div>
+
+          <div class="field" data-help="sessionContext">
+            <label for="sessionContext">Ce que tu fais en ce moment <span class="opt">facultatif</span></label>
+            <p class="hint">Deux ou trois phrases. À changer à chaque nouvelle situation.</p>
             <textarea
-              id="kbAbout"
+              id="sessionContext"
               rows="3"
               spellcheck="false"
-              placeholder="Ex. : C'est mon projet DNS Relay, que j'ai écrit seul en Go pendant mon alternance chez … Il sert à … Je dois pouvoir expliquer chaque choix technique."
+              placeholder="Ex. : Entretien d'embauche pour un poste de pentester junior chez un cabinet d'audit. On me pose des questions techniques et sur mon parcours."
             ></textarea>
-          </label>
-          <p class="note">
-            <button type="button" id="kbAddFiles" class="secondary">Ajouter des fichiers…</button>
-            <button type="button" id="kbAddFolder" class="secondary">Ajouter un dossier…</button>
-            <button type="button" id="kbSum" class="secondary">Résumer les fichiers (notes)</button>
-            <button type="button" id="kbSumAll" class="secondary">Refaire toutes les notes</button>
-            <button type="button" id="kbStop" class="secondary" hidden>Annuler</button>
-          </p>
-          <p class="note" id="kbProgress"></p>
-          <div id="kbStats" class="note"></div>
-          <label>
-            Fiche de compréhension (toujours transmise, modifiable)
-            <textarea id="kbBrief" rows="10" spellcheck="false" placeholder="Vide : clique sur « Générer la fiche » pour que Claude lise la base et en fasse la synthèse (architecture, éléments clés, choix et raisons, questions probables)."></textarea>
-          </label>
-          <p class="note">
-            <button type="button" id="kbGen" class="secondary">Générer la fiche avec Claude</button>
-            <button type="button" id="kbSaveText" class="secondary">Enregistrer présentation et fiche</button>
-            <span id="kbGenNote"></span>
-          </p>
-          <details>
-            <summary>Fichiers de la base (clique sur un nom pour lire sa note)</summary>
-            <div id="kbDocs"></div>
-            <pre id="kbNote" class="note" hidden></pre>
-          </details>
-        </div>
-        <p class="note" id="kbMsg"></p>
-      </section>
+          </div>
 
-      <section>
-        <h2>Déclenchement</h2>
-        <div class="grid">
-          <label>
-            Mode
-            <select id="mode">
-              <option value="manual">Manuel — réponse au raccourci</option>
-              <option value="auto">Automatique — à chaque fin de phrase</option>
+          <div class="field" data-help="mode">
+            <label>Quand répondre</label>
+            <input type="hidden" id="mode" />
+            <div class="choice" role="radiogroup">
+              <label class="choice-card">
+                <input type="radio" name="modeR" value="manual" />
+                <b>Quand je le demande</b>
+                <span>Avec le raccourci ou le bouton ⚡. Tu gardes la main, moins d'appels.</span>
+              </label>
+              <label class="choice-card">
+                <input type="radio" name="modeR" value="auto" />
+                <b>Tout seul</b>
+                <span>Dès qu'une question est posée. Plus rapide, plus d'appels à Claude.</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="row2">
+            <div class="field" data-help="replyLanguage">
+              <label for="replyLanguage">Langue des réponses</label>
+              <select id="replyLanguage">
+                <option value="auto">Celle de la conversation</option>
+                <option value="fr">Toujours en français</option>
+                <option value="en">Toujours en anglais</option>
+              </select>
+            </div>
+            <div class="field" data-help="maxTokens">
+              <label for="maxTokens">Longueur des réponses</label>
+              <select id="maxTokens">
+                <option value="200">Très courte</option>
+                <option value="400">Courte (recommandé)</option>
+                <option value="800">Moyenne</option>
+                <option value="1500">Longue</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field" data-help="model">
+            <label for="model">Modèle Claude</label>
+            <select id="model">
+              <option value="claude-haiku-5-5">Haiku — le plus rapide (recommandé en direct)</option>
+              <option value="claude-sonnet-5-5">Sonnet — plus réfléchi, un peu plus lent</option>
+              <option value="claude-opus-5-5">Opus — le plus intelligent, le plus lent et cher</option>
             </select>
-          </label>
-          <label>
-            Mémoire de la conversation envoyée à Claude (minutes)
-            <input id="bufferMinutes" type="number" min="0.5" max="30" step="0.5" />
-          </label>
-          <label>
-            Délai avant réponse auto (ms)
-            <input id="autoDebounceMs" type="number" min="0" max="10000" step="100" />
-          </label>
-          <label>
-            Intervalle minimum entre 2 réponses auto (ms)
-            <input id="autoMinGapMs" type="number" min="0" max="60000" step="500" />
-          </label>
-        </div>
-        <label class="inline">
-          <input id="autoEarly" type="checkbox" /> En mode auto, répondre dès que la question est reconnue, sans
-          attendre la fin de la validation de la phrase (réponse plus rapide)
-        </label>
-        <label class="inline">
-          <input id="autoOnlyQuestions" type="checkbox" /> En mode auto, ne répondre qu'aux questions
-          (économise les appels)
-        </label>
-      </section>
+          </div>
 
-      <section>
-        <h2>Raccourcis clavier</h2>
-        <p class="note">Clique dans un champ puis appuie sur la combinaison (au moins une touche Ctrl / Alt / Maj / Win).</p>
-        <div class="grid">
-          <label>Afficher / masquer <input id="hkToggle" class="hotkey" readonly /></label>
-          <label>Demander une réponse <input id="hkAsk" class="hotkey" readonly /></label>
-          <label>Vider transcription et réponse <input id="hkClear" class="hotkey" readonly /></label>
-        </div>
-      </section>
+          <div class="field" data-help="numbersInWords">
+            <label class="switch">
+              <input id="numbersInWords" type="checkbox" />
+              <span>Écrire les nombres, dates et heures en toutes lettres</span>
+            </label>
+            <p class="hint">Plus facile à lire à voix haute : « deux mille vingt-quatre » plutôt que « 2024 ».</p>
+          </div>
 
-      <section>
-        <h2>Fenêtre</h2>
-        <div class="grid">
-          <label>
-            Opacité (0.3 – 1)
-            <input id="opacity" type="number" min="0.3" max="1" step="0.05" />
-          </label>
-          <label>
-            Taille du texte (px)
-            <input id="fontSize" type="number" min="10" max="28" step="1" />
-          </label>
-        </div>
-        <label class="inline">
-          <input id="showTranscript" type="checkbox" /> Afficher la transcription en direct sous la réponse
-        </label>
-        <label class="inline">
-          <input id="contentProtection" type="checkbox" /> Masquer la fenêtre dans les captures et partages d'écran
-        </label>
-        <label class="inline"><input id="startHidden" type="checkbox" /> Démarrer avec la fenêtre masquée</label>
-        <label class="inline"><input id="launchAtStartup" type="checkbox" /> Lancer au démarrage de Windows (version installée)</label>
-      </section>
+          <details class="advanced">
+            <summary>Réglages avancés</summary>
+            <div class="field" data-help="autoEarly">
+              <label class="switch">
+                <input id="autoEarly" type="checkbox" />
+                <span>En mode « tout seul », commencer à répondre avant la fin de la phrase</span>
+              </label>
+            </div>
+            <div class="field" data-help="autoOnlyQuestions">
+              <label class="switch">
+                <input id="autoOnlyQuestions" type="checkbox" />
+                <span>En mode « tout seul », ne répondre qu'aux questions</span>
+              </label>
+            </div>
+            <div class="row3">
+              <div class="field" data-help="bufferMinutes">
+                <label for="bufferMinutes">Conversation retenue (min)</label>
+                <input id="bufferMinutes" type="number" min="0.5" max="30" step="0.5" />
+              </div>
+              <div class="field" data-help="autoDebounceMs">
+                <label for="autoDebounceMs">Attente avant réponse (ms)</label>
+                <input id="autoDebounceMs" type="number" min="0" max="10000" step="50" />
+              </div>
+              <div class="field" data-help="autoMinGapMs">
+                <label for="autoMinGapMs">Écart entre réponses (ms)</label>
+                <input id="autoMinGapMs" type="number" min="0" max="60000" step="500" />
+              </div>
+            </div>
+            <div class="field" data-help="systemPrompt">
+              <label for="systemPrompt">Instructions détaillées données à Claude</label>
+              <p class="hint">Remplies par le « type de situation ». Modifie-les si tu veux un style précis.</p>
+              <textarea id="systemPrompt" rows="8" spellcheck="false"></textarea>
+            </div>
+          </details>
+        </section>
 
-      <footer>
-        <span id="result"></span>
+        <!-- ============ Mon profil ============ -->
+        <section class="page" id="page-moi" data-page="moi" hidden>
+          <header class="page-head">
+            <h1>Mon profil</h1>
+            <p>
+              Pour que les réponses parlent de toi : ton parcours, ton poste, tes projets. Ces informations restent sur
+              ce PC et ne partent qu'avec les demandes à Claude.
+            </p>
+          </header>
+
+          <div class="field" data-help="ragEnabled">
+            <label class="switch"><input id="ragEnabled" type="checkbox" /><span>Utiliser mon profil dans les réponses</span></label>
+          </div>
+
+          <div class="field" data-help="ragProfile">
+            <label for="ragProfile">Qui je suis</label>
+            <p class="hint">Quelques lignes, envoyées à chaque demande.</p>
+            <textarea
+              id="ragProfile"
+              rows="7"
+              spellcheck="false"
+              placeholder="Ex. : Je m'appelle Alex, alternant en cybersécurité. Je vise un poste de pentester junior. Projets : un relais DNS en Go, un outil de scan web. Je tutoie, phrases courtes."
+            ></textarea>
+          </div>
+
+          <div class="field" data-help="ragDocs">
+            <label>Documents sur moi <span class="opt">facultatif</span></label>
+            <p class="hint">CV, notes, fiches projet en texte (.txt, .md, .json, .csv). Ajout et retrait immédiats.</p>
+            <button type="button" id="ragAdd" class="secondary">Ajouter des fichiers</button>
+            <div id="ragList" class="filelist"></div>
+            <p class="hint" id="ragNote"></p>
+          </div>
+
+          <details class="advanced">
+            <summary>Réglages avancés</summary>
+            <div class="field" data-help="ragTopK">
+              <label for="ragTopK">Passages de documents envoyés par demande</label>
+              <input id="ragTopK" type="number" min="1" max="10" step="1" />
+            </div>
+          </details>
+        </section>
+
+        <!-- ============ Documents de travail ============ -->
+        <section class="page" id="page-pro" data-page="pro" hidden>
+          <header class="page-head">
+            <h1>Documents de travail</h1>
+            <p>
+              Un projet de code, des cours, des textes de loi, des PDF… L'assistant les consulte pour répondre à des
+              questions précises comme « pourquoi as-tu écrit cette fonction comme ça ? ». Tout est lu sur ce PC.
+            </p>
+          </header>
+
+          <div class="field" data-help="kbEnabled">
+            <label class="switch">
+              <input id="kbEnabled" type="checkbox" /><span>Utiliser mes documents de travail dans les réponses</span>
+            </label>
+          </div>
+
+          <ol class="kbsteps">
+            <li>
+              <h3>Choisis ou crée une base</h3>
+              <div class="field" data-help="kbSelect">
+                <div class="kbbar">
+                  <select id="kbSelect" aria-label="Base choisie"></select>
+                  <button type="button" id="kbDelete" class="secondary danger">Supprimer</button>
+                </div>
+              </div>
+              <div class="field" data-help="kbName">
+                <div class="kbbar">
+                  <input id="kbName" type="text" maxlength="80" placeholder="Nom d'une nouvelle base, ex. « Projet DNS Relay »" />
+                  <button type="button" id="kbNew" class="secondary">Créer</button>
+                  <button type="button" id="kbRename" class="secondary">Renommer</button>
+                </div>
+              </div>
+            </li>
+
+            <li id="kbBody" hidden>
+              <h3>Ajoute des fichiers</h3>
+              <div class="field" data-help="kbFiles">
+                <p class="hint">
+                  Un dossier de projet entier ou des fichiers : code, PDF, Word, PowerPoint, texte… Les dossiers inutiles
+                  (node_modules, .git…) sont ignorés.
+                </p>
+                <div class="btnrow">
+                  <button type="button" id="kbAddFolder" class="secondary">Ajouter un dossier</button>
+                  <button type="button" id="kbAddFiles" class="secondary">Ajouter des fichiers</button>
+                  <button type="button" id="kbStop" class="secondary danger" hidden>Annuler</button>
+                </div>
+                <div class="progress" id="kbProgressBox" hidden><i id="kbBar"></i></div>
+                <p class="hint" id="kbProgress"></p>
+                <p class="stats" id="kbStats"></p>
+              </div>
+
+              <div class="field" data-help="kbAbout">
+                <label for="kbAbout">Ton lien avec ces documents</label>
+                <p class="hint">Si c'est ton projet, dis-le : l'assistant répondra à la première personne.</p>
+                <textarea
+                  id="kbAbout"
+                  rows="3"
+                  spellcheck="false"
+                  placeholder="Ex. : C'est mon projet DNS Relay v3, écrit seul en Go pendant mon alternance. Je dois pouvoir justifier chaque choix technique."
+                ></textarea>
+              </div>
+              <label class="switch active-switch"><input id="kbActive" type="checkbox" /><span>Base active</span></label>
+            </li>
+
+            <li id="kbStep3" hidden>
+              <h3>Laisse Claude comprendre le contenu</h3>
+              <div class="field" data-help="kbNotes">
+                <p class="hint">
+                  Une note par fichier (rôle, éléments, choix), puis une fiche de synthèse. Le coût en tokens est
+                  affiché avant de lancer.
+                </p>
+                <div class="btnrow">
+                  <button type="button" id="kbSum" class="secondary">Résumer les fichiers</button>
+                  <button type="button" id="kbGen" class="secondary">Générer la fiche</button>
+                  <button type="button" id="kbSumAll" class="link">Refaire toutes les notes</button>
+                </div>
+              </div>
+              <div class="field" data-help="kbBrief">
+                <label for="kbBrief">Fiche de synthèse <span id="kbGenNote" class="opt"></span></label>
+                <textarea
+                  id="kbBrief"
+                  rows="9"
+                  spellcheck="false"
+                  placeholder="Vide pour l'instant : clique sur « Générer la fiche ». Tu pourras la relire et la corriger ici."
+                ></textarea>
+                <div class="btnrow">
+                  <button type="button" id="kbSaveText" class="secondary">Enregistrer le lien et la fiche</button>
+                </div>
+              </div>
+              <details class="advanced">
+                <summary>Fichiers de la base</summary>
+                <p class="hint">Clique sur un nom pour lire la note écrite par Claude.</p>
+                <div id="kbDocs" class="filelist"></div>
+                <pre id="kbNote" hidden></pre>
+              </details>
+            </li>
+          </ol>
+          <p class="hint" id="kbMsg"></p>
+
+          <details class="advanced">
+            <summary>Réglages avancés</summary>
+            <div class="field" data-help="kbAutoSummary">
+              <label class="switch">
+                <input id="kbAutoSummary" type="checkbox" />
+                <span>Résumer automatiquement les nouveaux fichiers après un import</span>
+              </label>
+            </div>
+            <div class="row2">
+              <div class="field" data-help="kbTopK">
+                <label for="kbTopK">Passages envoyés par demande</label>
+                <input id="kbTopK" type="number" min="1" max="20" step="1" />
+              </div>
+              <div class="field" data-help="kbBudgetChars">
+                <label for="kbBudgetChars">Taille maximale des passages (caractères)</label>
+                <input id="kbBudgetChars" type="number" min="2000" max="40000" step="1000" />
+              </div>
+            </div>
+          </details>
+        </section>
+
+        <!-- ============ Fenêtre et raccourcis ============ -->
+        <section class="page" id="page-fenetre" data-page="fenetre" hidden>
+          <header class="page-head">
+            <h1>Fenêtre et raccourcis</h1>
+            <p>L'apparence de la petite fenêtre de réponse et les touches pour la piloter.</p>
+          </header>
+
+          <h2 class="sub">Raccourcis clavier</h2>
+          <p class="hint">Clique dans un champ, puis appuie sur la combinaison voulue (avec Ctrl, Alt, Maj ou Win).</p>
+          <div class="row3">
+            <div class="field" data-help="hkToggle">
+              <label for="hkToggle">Afficher / masquer</label>
+              <input id="hkToggle" class="hotkey" readonly />
+            </div>
+            <div class="field" data-help="hkAsk">
+              <label for="hkAsk">Demander une réponse</label>
+              <input id="hkAsk" class="hotkey" readonly />
+            </div>
+            <div class="field" data-help="hkClear">
+              <label for="hkClear">Repartir de zéro</label>
+              <input id="hkClear" class="hotkey" readonly />
+            </div>
+          </div>
+
+          <h2 class="sub">Apparence</h2>
+          <div class="row2">
+            <div class="field" data-help="opacity">
+              <label for="opacity">Opacité <output id="opacityOut"></output></label>
+              <input id="opacity" type="range" min="0.3" max="1" step="0.05" />
+            </div>
+            <div class="field" data-help="fontSize">
+              <label for="fontSize">Taille du texte <output id="fontOut"></output></label>
+              <input id="fontSize" type="range" min="10" max="28" step="1" />
+            </div>
+          </div>
+          <div class="field" data-help="showTranscript">
+            <label class="switch">
+              <input id="showTranscript" type="checkbox" /><span>Montrer la transcription sous la réponse</span>
+            </label>
+          </div>
+          <div class="field" data-help="contentProtection">
+            <label class="switch">
+              <input id="contentProtection" type="checkbox" /><span>Cacher la fenêtre dans les partages d'écran</span>
+            </label>
+          </div>
+          <div class="field" data-help="startHidden">
+            <label class="switch"><input id="startHidden" type="checkbox" /><span>Démarrer avec la fenêtre masquée</span></label>
+          </div>
+          <div class="field" data-help="launchAtStartup">
+            <label class="switch">
+              <input id="launchAtStartup" type="checkbox" /><span>Lancer avec Windows (version installée)</span>
+            </label>
+          </div>
+        </section>
+
+        <!-- ============ Diagnostic ============ -->
+        <section class="page" id="page-diag" data-page="diag" hidden>
+          <header class="page-head">
+            <h1>Diagnostic</h1>
+            <p>Pour vérifier que le son arrive et que la transcription fonctionne. Lance une vidéo pour tester.</p>
+          </header>
+          <div class="diagrow" data-help="diagState">
+            <span class="pill" id="dgListen">Écoute : …</span>
+            <span class="pill" id="dgCapture">Capture : …</span>
+            <span class="pill" id="dgStt">Transcription : …</span>
+            <button type="button" id="dgToggle" class="secondary">Démarrer l'écoute</button>
+          </div>
+          <p id="dgMessage" class="callout warn" hidden></p>
+          <div class="meters-wrap" data-help="meters"><p class="hint">Niveaux du son par sortie</p><div id="meters"></div></div>
+          <p class="hint" id="dgCounters"></p>
+          <p class="callout warn" id="dgHint" hidden></p>
+          <details class="advanced" open>
+            <summary>Journal</summary>
+            <pre id="logBox"></pre>
+          </details>
+        </section>
+      </main>
+
+      <footer id="savebar">
+        <span id="dirty" hidden>Modifications non enregistrées</span>
+        <span id="result" role="status"></span>
         <button type="submit" id="save">Enregistrer</button>
       </footer>
     </form>
+
+    <!-- Visite guidée et aide contextuelle -->
+    <div id="tour" hidden>
+      <div id="tourHole"></div>
+      <div id="tourCard" role="dialog" aria-modal="true" aria-labelledby="tourTitle">
+        <p id="tourCount"></p>
+        <h2 id="tourTitle"></h2>
+        <div id="tourBody"></div>
+        <div id="tourExample" hidden>
+          <p class="ex-label">Exemple</p>
+          <p id="tourExampleText"></p>
+          <button type="button" id="tourUseExample" class="secondary">Utiliser cet exemple</button>
+        </div>
+        <div class="tour-nav">
+          <button type="button" id="tourQuit" class="link">Quitter la visite</button>
+          <span class="grow"></span>
+          <button type="button" id="tourPrev" class="secondary">Précédent</button>
+          <button type="button" id="tourNext">Suivant</button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="./settings.ts"></script>
   </body>
 </html>

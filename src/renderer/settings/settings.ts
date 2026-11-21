@@ -1,4 +1,5 @@
 import { PRESETS } from '../../shared/defaults'
+import { initHelp, startTour, tourAlreadyDone } from './tour'
 import type {
   AppState,
   AudioDevice,
@@ -28,6 +29,98 @@ const select = (id: string) => $<HTMLSelectElement>(id)
 const CUSTOM = '__custom'
 const result = $('result')
 const saveBtn = $<HTMLButtonElement>('save')
+
+// ---------- Navigation entre les pages ----------
+
+const PAGES = ['accueil', 'cles', 'ecoute', 'reponses', 'moi', 'pro', 'fenetre', 'diag']
+
+function showPage(name: string): void {
+  if (!PAGES.includes(name)) name = 'accueil'
+  document.querySelectorAll<HTMLElement>('.page').forEach((p) => (p.hidden = p.dataset['page'] !== name))
+  document.querySelectorAll<HTMLAnchorElement>('[data-nav]').forEach((a) => {
+    const on = a.dataset['nav'] === name
+    a.classList.toggle('active', on)
+    if (on) a.setAttribute('aria-current', 'page')
+    else a.removeAttribute('aria-current')
+  })
+  $('pages').scrollTop = 0
+  if (location.hash !== `#${name}`) history.replaceState(null, '', `#${name}`)
+}
+
+// Tous les liens internes (#page) passent par showPage.
+document.addEventListener('click', (e) => {
+  const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="#"]')
+  if (!a) return
+  e.preventDefault()
+  showPage(a.getAttribute('href')!.slice(1))
+})
+showPage(location.hash.slice(1) || 'accueil')
+initHelp(showPage)
+$('tourStart').addEventListener('click', startTour)
+$('tourStart2').addEventListener('click', startTour)
+
+/** Sélecteur à choix fixes : ajoute une option si la valeur enregistrée n'en fait pas partie. */
+function setSelect(id: string, value: string, customLabel: (v: string) => string): void {
+  const sel = select(id)
+  if (![...sel.options].some((o) => o.value === value)) {
+    const o = document.createElement('option')
+    o.value = value
+    o.textContent = customLabel(value)
+    sel.appendChild(o)
+  }
+  sel.value = value
+}
+
+/** Curseurs : affiche la valeur à côté du titre. */
+const RANGE_OUT: [string, string, (v: number) => string][] = [
+  ['vadSilenceSecs', 'vadOut', (v) => `${v.toFixed(1).replace('.', ',')} s de silence`],
+  ['gateThreshold', 'gateOut', (v) => (v <= 0.002 ? 'élevée' : v <= 0.01 ? 'moyenne' : 'faible')],
+  ['opacity', 'opacityOut', (v) => `${Math.round(v * 100)} %`],
+  ['fontSize', 'fontOut', (v) => `${v} px`]
+]
+function syncRanges(): void {
+  for (const [inp, out, fmt] of RANGE_OUT) $(out).textContent = fmt(Number(input(inp).value))
+}
+for (const [inp] of RANGE_OUT) input(inp).addEventListener('input', syncRanges)
+
+// ---------- Modifications non enregistrées ----------
+
+let dirty = false
+function setDirty(on: boolean): void {
+  dirty = on
+  $('dirty').hidden = !on
+  $('savebar').classList.toggle('pending', on)
+  if (on) say('')
+}
+// Champs qui ne passent pas par « Enregistrer » (actions immédiates) : exclus.
+const IMMEDIATE = new Set(['kbSelect', 'kbName', 'kbAbout', 'kbBrief', 'kbActive'])
+$('form').addEventListener('input', (e) => {
+  const id = (e.target as HTMLElement).id
+  if (!IMMEDIATE.has(id)) setDirty(true)
+})
+$('form').addEventListener('change', (e) => {
+  const id = (e.target as HTMLElement).id
+  if (!IMMEDIATE.has(id) && (e.target as HTMLElement).closest('.page')) setDirty(true)
+})
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault()
+    $<HTMLFormElement>('form').requestSubmit()
+  }
+})
+window.addEventListener('beforeunload', (e) => {
+  if (dirty) e.preventDefault()
+})
+
+// ---------- Accueil : étapes de démarrage ----------
+
+const setup = { keys: false, audio: false, context: false }
+function renderSetup(): void {
+  $('stepKeys').classList.toggle('done', setup.keys)
+  $('stepAudio').classList.toggle('done', setup.audio)
+  $('stepContext').classList.toggle('done', setup.context)
+  $('navKeys').classList.toggle('on', !setup.keys)
+}
 
 // ---------- Raccourcis : enregistrement d'une combinaison ----------
 
@@ -112,9 +205,9 @@ async function loadDevices(selected: string): Promise<void> {
     o.textContent = label
     sel.appendChild(o)
   }
-  add('loopback', 'Sortie système — loopback de la sortie par défaut de Windows')
-  add('mixer', 'Mixeur de sorties Windows — tous les canaux SteelSeries Sonar (recommandé avec Sonar)')
-  for (const d of devices) add(d.id, `Entrée : ${d.label}`)
+  add('loopback', 'Sortie par défaut de Windows')
+  add('mixer', 'Toutes les sorties (mixeur) — recommandé avec SteelSeries Sonar')
+  for (const d of devices) add(d.id, `Périphérique d'entrée : ${d.label}`)
   if (selected !== 'loopback' && selected !== 'mixer' && !devices.some((d) => d.id === selected)) {
     add(selected, 'Périphérique enregistré (introuvable)')
   }
@@ -201,10 +294,20 @@ function fill(s: SettingsView): void {
   const defined = (hint: string) => `•••••••• (définie${hint ? `, se termine par « ${hint} »` : ''})`
   input('elevenLabsKey').placeholder = s.hasElevenLabsKey
     ? defined(s.elevenLabsKeyHint)
-    : 'Colle ta clé ElevenLabs'
+    : 'Colle ta clé ElevenLabs (sk_…)'
   input('anthropicKey').placeholder = s.hasAnthropicKey
     ? defined(s.anthropicKeyHint)
     : 'Colle ta clé Claude (sk-ant-…)'
+  const status = (id: string, ok: boolean) => {
+    const el = $(id)
+    el.textContent = ok ? 'enregistrée' : 'manquante'
+    el.className = `status ${ok ? 'ok' : 'missing'}`
+  }
+  status('elevenStatus', s.hasElevenLabsKey)
+  status('claudeStatus', s.hasAnthropicKey)
+  setup.keys = s.hasElevenLabsKey && s.hasAnthropicKey
+  setup.context = !!(s.sessionContext.trim() || s.ragProfile.trim())
+  renderSetup()
   $('encWarn').hidden = s.encryptionAvailable
 
   select('sttLanguage').value = s.sttLanguage
@@ -227,13 +330,13 @@ function fill(s: SettingsView): void {
   renderMixerList()
   void loadDevices(s.audioSource)
 
-  input('model').value = s.model
+  setSelect('model', s.model, (v) => `${v} (personnalisé)`)
   select('replyLanguage').value = s.replyLanguage
-  input('maxTokens').value = String(s.maxTokens)
+  setSelect('maxTokens', String(s.maxTokens), (v) => `${v} tokens (personnalisé)`)
   $<HTMLTextAreaElement>('systemPrompt').value = s.systemPrompt
   syncPresetLabel()
 
-  select('mode').value = s.mode
+  document.querySelectorAll<HTMLInputElement>('input[name="modeR"]').forEach((r) => (r.checked = r.value === s.mode))
   input('bufferMinutes').value = String(s.bufferMinutes)
   input('autoDebounceMs').value = String(s.autoDebounceMs)
   input('autoMinGapMs').value = String(s.autoMinGapMs)
@@ -249,6 +352,11 @@ function fill(s: SettingsView): void {
   input('contentProtection').checked = s.overlay.contentProtection
   input('startHidden').checked = s.startHidden
   input('launchAtStartup').checked = s.launchAtStartup
+  $('cheatToggle').textContent = s.hotkeys.toggle
+  $('cheatAsk').textContent = s.hotkeys.ask
+  $('cheatClear').textContent = s.hotkeys.clear
+  syncRanges()
+  setDirty(false)
 }
 
 // ---------- Enregistrement ----------
@@ -280,7 +388,7 @@ function collect(): SettingsPatch {
       maxTokens: Number(input('maxTokens').value),
       systemPrompt: $<HTMLTextAreaElement>('systemPrompt').value,
 
-      mode: select('mode').value as Mode,
+      mode: (document.querySelector<HTMLInputElement>('input[name="modeR"]:checked')?.value ?? 'manual') as Mode,
       bufferMinutes: Number(input('bufferMinutes').value),
       autoDebounceMs: Number(input('autoDebounceMs').value),
       autoMinGapMs: Number(input('autoMinGapMs').value),
@@ -323,7 +431,7 @@ $('form').addEventListener('submit', async (e) => {
   try {
     const res = await window.api.invoke<SaveResult>('settings:save', collect())
     const problems = [...(res.message ? [res.message] : []), ...res.hotkeyErrors]
-    say(problems.length ? problems.join(' · ') : 'Enregistré ✓', problems.length ? 'err' : 'ok')
+    say(problems.length ? problems.join(' · ') : 'Enregistré', problems.length ? 'err' : 'ok')
 
     input('elevenLabsKey').value = ''
     input('anthropicKey').value = ''
@@ -337,7 +445,11 @@ $('form').addEventListener('submit', async (e) => {
   }
 })
 
-void window.api.invoke<SettingsView>('settings:get').then(fill)
+void window.api.invoke<SettingsView>('settings:get').then((s) => {
+  fill(s)
+  // Première ouverture : proposer la visite si les clés ne sont pas encore là.
+  if (!tourAlreadyDone() && !(s.hasElevenLabsKey && s.hasAnthropicKey)) window.setTimeout(startTour, 400)
+})
 
 // ---------- Mémoire personnelle : documents ----------
 
@@ -365,7 +477,7 @@ function renderRag(docs: RagDoc[], errors: string[] = []): void {
     list.appendChild(row)
   }
   const note = $('ragNote')
-  note.className = errors.length ? 'warn' : 'note'
+  note.className = errors.length ? 'hint warn' : 'hint'
   note.textContent = errors.length
     ? errors.join(' · ')
     : docs.length
@@ -386,7 +498,7 @@ let kbBusy = false
 
 const kbMsg = (text: string, warn = false): void => {
   const el = $('kbMsg')
-  el.className = warn ? 'warn' : 'note'
+  el.className = warn ? 'hint warn' : 'hint'
   el.textContent = text
 }
 
@@ -418,6 +530,7 @@ function renderKb(): void {
   sel.value = kbCurrent
   const cur = kbCurrentInfo()
   $('kbBody').hidden = !cur
+  $('kbStep3').hidden = !cur
   $<HTMLButtonElement>('kbRename').disabled = !cur
   $<HTMLButtonElement>('kbDelete').disabled = !cur
   if (!cur) {
@@ -430,9 +543,9 @@ function renderKb(): void {
   const brief = $<HTMLTextAreaElement>('kbBrief')
   if (document.activeElement !== brief) brief.value = cur.brief
   $('kbStats').textContent =
-    `${cur.docs} fichier(s) · ${cur.summarized} avec note · ${cur.chunks} extraits · ${fmtSize(cur.chars)}` +
+    `${cur.docs} fichier(s), dont ${cur.summarized} avec une note · ${fmtSize(cur.chars)}` +
     (cur.indexing ? ' · indexation en cours…' : '') +
-    (cur.brief ? '' : ' · pas encore de fiche de compréhension')
+    (cur.brief ? '' : ' · pas encore de fiche de synthèse')
   $('kbGenNote').textContent = cur.briefAt ? `Fiche du ${new Date(cur.briefAt).toLocaleString('fr-FR')}` : ''
   void renderKbDocs()
 }
@@ -653,13 +766,17 @@ $('kbGen').addEventListener('click', () => {
 window.api.on('kb:progress', (p: KbProgress) => {
   const el = $('kbProgress')
   if (p.kbId !== kbCurrent) return
+  const box = $('kbProgressBox')
   if (p.finished) {
     el.textContent = p.message ?? ''
+    box.hidden = true
     void refreshKb()
     return
   }
   const what = p.task === 'import' ? 'Import' : p.task === 'index' ? 'Indexation' : p.task === 'summary' ? 'Notes par fichier' : 'Synthèse'
-  el.textContent = `${what} : ${p.done}/${p.total}${p.label ? ` — ${p.label}` : ''}`
+  box.hidden = !p.total
+  $('kbBar').style.width = `${p.total ? Math.round((100 * p.done) / p.total) : 0}%`
+  el.textContent = `${what} : ${p.done} sur ${p.total}${p.label ? ` — ${p.label}` : ''}`
 })
 
 void refreshKb()
@@ -704,6 +821,7 @@ function renderState(st: AppState): void {
   msg.hidden = !st.message
   msg.textContent = st.message ?? ''
   $('dgToggle').textContent = st.listening ? "Arrêter l'écoute" : "Démarrer l'écoute"
+  $('navDiag').classList.toggle('on', st.capture === 'error' || st.stt === 'error')
   renderCounters()
 }
 
@@ -743,7 +861,13 @@ function renderLevels(l: LevelMessage): void {
     const db = dbOf(r.value)
     ;(row.querySelector('.db') as HTMLElement).textContent = Number.isFinite(db) ? `${db.toFixed(0)} dB` : '−∞ dB'
   })
-  if (rows.some((r) => r.value > 0.002)) lastSoundAt = Date.now()
+  if (rows.some((r) => r.value > 0.002)) {
+    lastSoundAt = Date.now()
+    if (!setup.audio) {
+      setup.audio = true
+      renderSetup()
+    }
+  }
   renderCounters()
 }
 
