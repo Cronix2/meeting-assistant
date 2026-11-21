@@ -11,7 +11,7 @@ Petite appli Windows 11 (Electron + TypeScript) qui écoute l'audio de ton burea
 
 1. Va dans l'onglet **Releases** du dépôt et télécharge `DeskAssistant-Setup-x.y.z.exe`.
 2. Lance-le. L'installeur n'est **pas signé** : Windows SmartScreen affichera « Windows a protégé votre ordinateur » → *Informations complémentaires* → *Exécuter quand même*.
-3. Ouvre les **Réglages** (⚙ dans la fenêtre, ou l'icône de la zone de notification) et colle tes clés API :
+3. Ouvre les **Réglages** (la **visite guidée** se lance à la première ouverture et reste accessible en bas de la barre latérale) (⚙ dans la fenêtre, ou l'icône de la zone de notification) et colle tes clés API :
    - une clé **ElevenLabs** (permission *Speech to Text*),
    - une clé **Anthropic** (Claude).
 
@@ -46,6 +46,7 @@ Tous les raccourcis sont modifiables dans les Réglages.
 - **Contexte de session & jeu de rôle** : Claude repère les mises en situation (exercices, entretiens simulés) et répond comme ton personnage ; un champ « contexte » permet de le forcer.
 - **Nombres, dates et heures en toutes lettres** (désactivable).
 - **Panneau Diagnostic en direct** dans les Réglages : niveaux par sortie audio, états capture / transcription, journal.
+- **Réglages en pages** (Accueil, Clés, Écoute, Réponses, Mon profil, Documents de travail, Fenêtre, Diagnostic), avec une **visite guidée** pas à pas et un bouton « ? » sur chaque réglage : à quoi il sert, quoi y mettre, un exemple que l'on peut insérer d'un clic. Les réglages techniques sont rangés dans « Réglages avancés ».
 - Prompt système personnalisable (presets : général, jeu de rôle, réunion, entretien, cours, traduction).
 
 ## Données et confidentialité

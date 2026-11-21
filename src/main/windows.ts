@@ -145,10 +145,10 @@ export function openSettingsWindow(): void {
     return
   }
   settingsWin = new BrowserWindow({
-    width: 760,
-    height: 820,
-    minWidth: 560,
-    minHeight: 480,
+    width: 1000,
+    height: 800,
+    minWidth: 600,
+    minHeight: 520,
     title: 'Desk Assistant — Réglages',
     backgroundColor: '#14161b',
     autoHideMenuBar: true,
