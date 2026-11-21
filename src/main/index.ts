@@ -1,9 +1,17 @@
+import path from 'node:path'
 import { BrowserWindow, Menu, app, desktopCapturer, dialog, ipcMain, session } from 'electron'
 import type {
   AppState,
   AudioDevice,
   CaptureOptions,
   DiagSnapshot,
+  KbBriefEstimate,
+  KbDocInfo,
+  KbImportResult,
+  KbInfo,
+  KbPatch,
+  KbSummaryEstimate,
+  KbSummaryResult,
   LevelMessage,
   MixerListResult,
   OverlayPrefsMessage,
@@ -23,6 +31,23 @@ import {
   pickDevices,
   type MixerLevel
 } from './helper'
+import { claudeComplete, estimateBrief, generateBrief } from './kb/brief'
+import {
+  clearSummaries,
+  createBase,
+  deleteBase,
+  importPaths,
+  initKnowledge,
+  listBases,
+  listDocs as listKbDocs,
+  readSummary,
+  removeDoc as removeKbDoc,
+  setBrief,
+  startIndexing,
+  updateBase
+} from './kb/knowledge'
+import { estimateSummaries, summarizeBase } from './kb/summaries'
+import { explain } from './llm'
 import { getLog, log, onLog } from './log'
 import { Pipeline } from './pipeline'
 import { RAG_EXTENSIONS, addFiles, listDocs, removeDoc } from './rag'
@@ -89,7 +114,7 @@ async function evalInCapture<T>(code: string): Promise<T> {
 // ---------- Messages vers l'overlay ----------
 
 /** La fenêtre de réglages n'a besoin que de l'état, des niveaux et du journal (panneau Diagnostic). */
-const SETTINGS_CHANNELS = new Set(['state', 'level', 'log'])
+const SETTINGS_CHANNELS = new Set(['state', 'level', 'log', 'kb:progress'])
 
 function sendTo(win: BrowserWindow | null | undefined, channel: string, payload?: unknown): void {
   if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
@@ -97,7 +122,7 @@ function sendTo(win: BrowserWindow | null | undefined, channel: string, payload?
 }
 
 function send(channel: string, payload?: unknown): void {
-  sendTo(overlayWin, channel, payload)
+  if (channel !== 'kb:progress') sendTo(overlayWin, channel, payload)
   if (SETTINGS_CHANNELS.has(channel)) sendTo(getSettingsWindow(), channel, payload)
 }
 
@@ -241,6 +266,8 @@ async function handleSave(patch: SettingsPatch): Promise<SaveResult> {
 async function main(): Promise<void> {
   Menu.setApplicationMenu(null)
   settings = loadSettings()
+  initKnowledge(path.join(app.getPath('userData'), 'knowledge'), { log, emit: (p) => send('kb:progress', p) })
+  startIndexing()
   setupLoopback()
 
   captureWin = await createCaptureWindow()
@@ -378,8 +405,127 @@ function registerIpc(): void {
     return out
   })
   ipcMain.handle('rag:remove', (_e, id: string): RagDoc[] => removeDoc(String(id)))
+  registerKnowledgeIpc()
   ipcMain.handle('settings:get', (): SettingsView => currentView())
   ipcMain.handle('settings:save', (_e, patch: SettingsPatch) => handleSave(patch))
+}
+
+// ---------- Mémoire professionnelle (bases de connaissances) ----------
+
+/** Une seule tâche longue (import ou synthèse) par base à la fois. */
+const kbJobs = new Map<string, { kind: 'import' | 'brief' | 'summary'; flag: { aborted: boolean }; abort: AbortController }>()
+
+function startKbJob(id: string, kind: 'import' | 'brief' | 'summary') {
+  if (kbJobs.has(id)) throw new Error('une opération est déjà en cours sur cette base')
+  const job = { kind, flag: { aborted: false }, abort: new AbortController() }
+  kbJobs.set(id, job)
+  return job
+}
+
+function registerKnowledgeIpc(): void {
+  const parent = () => getSettingsWindow() ?? undefined
+  ipcMain.handle('kb:list', (): KbInfo[] => listBases())
+  ipcMain.handle('kb:create', (_e, name: string): KbInfo => createBase(String(name ?? '')))
+  ipcMain.handle('kb:update', (_e, a: { id: string; patch: KbPatch }): KbInfo | null => updateBase(String(a.id), a.patch ?? {}))
+  ipcMain.handle('kb:delete', (_e, id: string): KbInfo[] => {
+    kbJobs.get(String(id))?.abort.abort()
+    deleteBase(String(id))
+    return listBases()
+  })
+  ipcMain.handle('kb:docs', (_e, id: string): KbDocInfo[] => listKbDocs(String(id)))
+  ipcMain.handle('kb:removeDoc', (_e, a: { id: string; docId: string }): KbInfo[] => {
+    removeKbDoc(String(a.id), String(a.docId))
+    return listBases()
+  })
+  ipcMain.handle('kb:cancel', (_e, id: string): void => {
+    const job = kbJobs.get(String(id))
+    if (!job) return
+    job.flag.aborted = true
+    job.abort.abort()
+  })
+
+  ipcMain.handle('kb:import', async (_e, a: { id: string; mode: 'files' | 'folder' }): Promise<KbImportResult | null> => {
+    const opts: Electron.OpenDialogOptions =
+      a.mode === 'folder'
+        ? { title: 'Ajouter un dossier (projet, cours…)', properties: ['openDirectory', 'multiSelections'] }
+        : { title: 'Ajouter des fichiers', properties: ['openFile', 'multiSelections'] }
+    const w = parent()
+    const res = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
+    if (res.canceled || !res.filePaths.length) return null
+    const job = startKbJob(String(a.id), 'import')
+    try {
+      return await importPaths(String(a.id), res.filePaths, job.flag)
+    } finally {
+      kbJobs.delete(String(a.id))
+    }
+  })
+
+  ipcMain.handle('kb:sumEstimate', (_e, id: string): KbSummaryEstimate => estimateSummaries(String(id)))
+  ipcMain.handle('kb:note', (_e, a: { id: string; docId: string }): string => readSummary(String(a.id), String(a.docId)))
+  ipcMain.handle('kb:clearNotes', (_e, id: string): KbInfo[] => {
+    clearSummaries(String(id))
+    return listBases()
+  })
+  ipcMain.handle('kb:summarize', async (_e, id: string): Promise<KbSummaryResult> => {
+    const kbId = String(id)
+    const apiKey = getSecret('anthropic')
+    if (!apiKey) return { ok: false, message: 'Clé API Claude manquante (section Clés API).', done: 0, failed: 0 }
+    let job
+    try {
+      job = startKbJob(kbId, 'summary')
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e), done: 0, failed: 0 }
+    }
+    try {
+      log(`[base] notes par fichier lancées avec ${settings.model}`)
+      const res = await summarizeBase({
+        kbId,
+        complete: claudeComplete(apiKey, settings.model, job.abort.signal),
+        signal: job.flag,
+        onProgress: (p) => send('kb:progress', p)
+      })
+      log(`[base] notes : ${res.done} créée(s), ${res.failed} en échec`)
+      return res
+    } catch (e) {
+      const message = job.flag.aborted ? 'Annulé.' : explain(e)
+      send('kb:progress', { kbId, task: 'summary', done: 0, total: 0, label: '', finished: true, message })
+      return { ok: false, message, done: 0, failed: 0 }
+    } finally {
+      kbJobs.delete(kbId)
+    }
+  })
+
+  ipcMain.handle('kb:estimate', (_e, id: string): KbBriefEstimate => estimateBrief(String(id)))
+
+  ipcMain.handle('kb:brief', async (_e, id: string): Promise<{ ok: boolean; message?: string; info?: KbInfo | null }> => {
+    const kbId = String(id)
+    const apiKey = getSecret('anthropic')
+    if (!apiKey) return { ok: false, message: 'Clé API Claude manquante (section Clés API).' }
+    let job
+    try {
+      job = startKbJob(kbId, 'brief')
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) }
+    }
+    try {
+      log(`[base] synthèse lancée avec ${settings.model}`)
+      const text = await generateBrief({
+        kbId,
+        complete: claudeComplete(apiKey, settings.model, job.abort.signal),
+        signal: job.flag,
+        onProgress: (p) => send('kb:progress', p)
+      })
+      setBrief(kbId, text)
+      log(`[base] fiche de compréhension prête (${text.length} caractères)`)
+      return { ok: true, info: listBases().find((b) => b.id === kbId) ?? null }
+    } catch (e) {
+      const message = job.flag.aborted ? 'Synthèse annulée.' : explain(e)
+      send('kb:progress', { kbId, task: 'brief', done: 0, total: 0, label: '', finished: true, message })
+      return { ok: false, message }
+    } finally {
+      kbJobs.delete(kbId)
+    }
+  })
 }
 
 if (!app.requestSingleInstanceLock()) {

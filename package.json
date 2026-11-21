@@ -1,7 +1,7 @@
 {
   "name": "desk-assistant",
   "productName": "Desk Assistant",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Écoute l'audio du bureau Windows, transcrit (ElevenLabs Scribe) et répond via Claude dans une petite fenêtre discrète.",
   "author": "Cronix2",
   "license": "UNLICENSED",
@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "latest",
+    "unpdf": "^1.0.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {

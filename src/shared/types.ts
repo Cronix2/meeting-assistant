@@ -58,6 +58,14 @@ export interface Settings {
   ragProfile: string
   /** Nombre maximum d'extraits de documents ajoutés par demande */
   ragTopK: number
+  /** Mémoire professionnelle : ajoute la fiche et des extraits des bases de connaissances au prompt */
+  kbEnabled: boolean
+  /** Nombre maximum d'extraits de bases de connaissances ajoutés par demande */
+  kbTopK: number
+  /** Taille maximale (caractères) des extraits de bases de connaissances par demande */
+  kbBudgetChars: number
+  /** Résumer chaque fichier avec Claude à l'import (notes consultables) */
+  kbAutoSummary: boolean
   /** Mixeur : détecte automatiquement les canaux SteelSeries Sonar (Game, Chat, Média, Aux) */
   mixerAutoSonar: boolean
   /** Mixeur : identifiants de sorties Windows ajoutées à la main */
@@ -137,6 +145,83 @@ export interface RagDoc {
 export interface RagChange {
   docs: RagDoc[]
   errors: string[]
+}
+
+/** Base de connaissances (mémoire professionnelle) */
+export interface KbInfo {
+  id: string
+  name: string
+  enabled: boolean
+  /** Présentation écrite par l'utilisateur (« c'est mon projet X, je l'ai codé seul… ») : toujours transmise */
+  about: string
+  /** Fiche de compréhension (générée par Claude puis modifiable) : toujours transmise */
+  brief: string
+  briefAt: number
+  docs: number
+  chars: number
+  chunks: number
+  /** Nombre de fichiers qui ont une note de résumé */
+  summarized: number
+  /** Index de recherche en cours de construction */
+  indexing: boolean
+  createdAt: number
+}
+
+export interface KbDocInfo {
+  id: string
+  label: string
+  kind: 'code' | 'text'
+  chars: number
+  chunks: number
+}
+
+export interface KbProgress {
+  kbId: string
+  task: 'import' | 'index' | 'brief' | 'summary'
+  done: number
+  total: number
+  label: string
+  finished?: boolean
+  message?: string
+}
+
+export interface KbImportResult {
+  added: number
+  unchanged: number
+  skipped: number
+  errors: string[]
+  truncated: boolean
+}
+
+export interface KbBriefEstimate {
+  inputChars: number
+  calls: number
+  approxTokens: number
+  sampled: boolean
+  /** La synthèse part des notes par fichier plutôt que des fichiers bruts */
+  fromNotes?: boolean
+}
+
+export interface KbSummaryEstimate {
+  /** Fichiers qui vont être résumés */
+  files: number
+  inputChars: number
+  calls: number
+  approxTokens: number
+}
+
+export interface KbSummaryResult {
+  ok: boolean
+  message?: string
+  done: number
+  failed: number
+}
+
+export interface KbPatch {
+  name?: string
+  enabled?: boolean
+  about?: string
+  brief?: string
 }
 
 /** Sortie audio Windows (périphérique de rendu) listée par le helper natif. */

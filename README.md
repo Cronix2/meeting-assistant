@@ -37,6 +37,11 @@ Tous les raccourcis sont modifiables dans les Réglages.
 
 - **Mixeur de sorties Windows** (SteelSeries Sonar…) : un petit helper natif (`helper/LoopbackMixer.cs`) écoute en loopback chaque canal Sonar (Game, Chat, Média, Aux) en même temps, sans mode Streamer. Il est compilé au premier usage avec `csc.exe`, fourni avec Windows (rien à installer).
 - **Mémoire personnelle (RAG local)** : un profil permanent + des documents (`.txt`, `.md`, `.json`, `.csv`…) dont les extraits les plus proches de la conversation (classement BM25) sont ajoutés à chaque demande.
+- **Mémoire professionnelle (bases de connaissances)** : tu crées des bases (projet de code, cours, textes de loi, PDF…) et tu y ajoutes des **fichiers ou des dossiers entiers**. Sont lus : tout fichier texte/code (Python, C/C++, JS/TS, PHP, HTML, CSS, Go, Rust, Java, C#, SQL, shell, YAML/JSON, logs… ; les extensions inconnues mais lisibles sont traitées comme du code), plus PDF, Word, PowerPoint, notebooks. Tout est lu et indexé localement ; le code est découpé **par fonction / classe / sélecteur** (nom du fichier, numéros de ligne, noms des fonctions).
+  - **Note par fichier** : à l'import, Claude écrit une courte note par fichier (rôle, noms exacts des éléments, choix, mots-clés FR/EN). Les notes sont indexées : une question posée « avec ses propres mots » retrouve le bon fichier par sa note, puis l'appli renvoie à Claude la note **et** les passages exacts du fichier (avec leurs lignes) pour qu'il puisse expliquer puis citer. Une « carte des fichiers » (une ligne par fichier) dit toujours à Claude de quel fichier on parle.
+  - **Fiche de compréhension** de la base (architecture, éléments clés, choix et raisons, questions probables), générée à partir des notes quand la base est grosse, relisible et modifiable.
+  - **Présentation** (« c'est mon projet, je l'ai écrit seul… ») : Claude répond alors à la première personne.
+  - Les notes et la fiche demandent des appels à Claude : une estimation des tokens est affichée et une confirmation est demandée au-delà de ~150 000 tokens.
 - **Mémoire de conversation** : les réponses déjà données sont replacées dans l'historique envoyé à Claude, pour qu'il ne se répète pas et reste cohérent.
 - **Contexte de session & jeu de rôle** : Claude repère les mises en situation (exercices, entretiens simulés) et répond comme ton personnage ; un champ « contexte » permet de le forcer.
 - **Nombres, dates et heures en toutes lettres** (désactivable).
@@ -51,10 +56,11 @@ Le dépôt ne contient **aucune clé ni donnée personnelle**. Tout ce qui est p
 |---|---|
 | `secrets.json` | tes clés API, chiffrées avec DPAPI (illisibles hors de ta session Windows) |
 | `settings.json` | tes réglages (prompt, raccourcis, profil de la mémoire…) |
-| `rag.json` | le texte des documents que tu ajoutes à la mémoire |
+| `rag.json` | le texte des documents que tu ajoutes à la mémoire personnelle |
+| `knowledge/` | tes bases de connaissances : texte extrait des fichiers + fiches (l'index de recherche est reconstruit en mémoire au démarrage) |
 | `helper/` | l'exécutable du mixeur compilé localement |
 
-- **Ce qui part sur le réseau** : l'audio vers ElevenLabs ; la transcription récente, tes réponses précédentes, ton profil et les extraits de documents retenus vers l'API Anthropic. Évite d'y mettre ce que tu ne veux pas envoyer à ces services.
+- **Ce qui part sur le réseau** : l'audio vers ElevenLabs ; la transcription récente, tes réponses précédentes, ton profil, les extraits de documents retenus et les fiches des bases actives vers l'API Anthropic ; les notes par fichier et la fiche envoient à Claude le contenu des fichiers (échantillon pour les très gros fichiers), avec une estimation du volume et une confirmation avant les gros volumes. Évite d'y mettre ce que tu ne veux pas envoyer à ces services.
 - La transcription reste en mémoire vive (jamais écrite sur disque).
 - Informe les participants d'un appel avant de l'utiliser dessus.
 - Le texte transcrit est traité comme des données non fiables (anti-injection de prompt) ; Claude n'a de toute façon aucun outil ici.
@@ -85,7 +91,7 @@ Le workflow GitHub Actions `Release Windows` construit l'installeur sur un runne
 ## Structure
 
 ```
-src/main/       index (bootstrap + IPC), pipeline (cerveau), stt (Scribe), llm (Claude), rag (mémoire),
+src/main/       index (bootstrap + IPC), pipeline (cerveau), stt (Scribe), llm (Claude), rag (mémoire perso), kb/ (bases de connaissances : lecture des fichiers, découpage, index BM25, fiche Claude),
                 helper (mixeur natif), gate (silence), windows, shortcuts, tray, settings, buffer, log
 src/preload/    pont IPC à liste blanche de canaux
 src/renderer/   capture/ (page cachée, audio) · overlay/ · settings/
@@ -107,5 +113,6 @@ helper/         LoopbackMixer.cs (capture WASAPI multi-sorties, compilée au pre
 
 - Ta propre voix (micro) n'est pas captée : seule la sortie audio l'est.
 - Pas de séparation des locuteurs, pas de mise à jour automatique.
+- Bases de connaissances : la recherche est lexicale (BM25), complétée par les notes de Claude pour le « sens » (sans notes, elle ne retrouve que les mots présents) ; PDF scannés (images) non lus, anciens `.doc`/`.ppt` à convertir ; au-delà de ~100 Mo de texte l'appli consomme beaucoup de mémoire. Les notes ne voient que les ~16 000 premiers caractères d'un fichier très long (début + fin) ; la fiche est faite sur un échantillon si la base dépasse ~800 000 caractères sans notes.
 - Installeur non signé (avertissement SmartScreen) et icône Electron par défaut.
 - Le mixeur nécessite Windows et son compilateur C# intégré (`csc.exe`, présent par défaut).

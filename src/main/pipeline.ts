@@ -2,6 +2,7 @@ import type { AppState, CaptureOptions, Mode, Settings, SttStatus } from '../sha
 import { TranscriptBuffer } from './buffer'
 import { Responder, buildSystem, buildUserMessage } from './llm'
 import { log } from './log'
+import { buildKbMemory } from './kb/knowledge'
 import { buildMemory } from './rag'
 import { getSecret } from './settings'
 import { SttClient } from './stt'
@@ -184,6 +185,18 @@ export class Pipeline {
     this.autoTimer = setTimeout(() => void this.ask('auto'), wait)
   }
 
+  /** Prompt système : règles + mémoire personnelle + bases de connaissances (fiches et extraits de la conversation). */
+  private systemFor(s: Settings, transcript: string) {
+    const t0 = Date.now()
+    const kb = buildKbMemory({ enabled: s.kbEnabled, transcript, topK: s.kbTopK, budgetChars: s.kbBudgetChars })
+    if (kb.hits.length) {
+      const passages = kb.hits.reduce((n, h) => n + h.excerpts.length, 0)
+      const files = kb.hits.map((h) => h.label)
+      log(`[base] ${kb.hits.length} fichier(s), ${passages} passage(s) en ${Date.now() - t0} ms : ${files.slice(0, 4).join(', ')}${files.length > 4 ? '…' : ''}`)
+    }
+    return buildSystem(s, { personal: buildMemory(s, transcript), kbSheets: kb.stable, kbExcerpts: kb.dynamic })
+  }
+
   async ask(trigger: 'manual' | 'auto', early = false): Promise<void> {
     const s = this.deps.getSettings()
     const apiKey = getSecret('anthropic')
@@ -210,7 +223,7 @@ export class Pipeline {
     await this.responder.ask({
       apiKey,
       model: s.model,
-      system: buildSystem(s, buildMemory(s, transcript)),
+      system: this.systemFor(s, transcript),
       user: buildUserMessage(transcript, trigger),
       maxTokens: s.maxTokens,
       onDelta: (d) => {
