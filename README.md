@@ -82,9 +82,9 @@ Repli pour le développement : variables d'environnement `ELEVENLABS_API_KEY` et
 ### Publier une version
 
 ```powershell
-# 1. mettre à jour "version" dans package.json, puis :
-git tag v0.1.0
-git push origin v0.1.0
+# la version de l'appli et le nom de l'installeur suivent le tag
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 Le workflow GitHub Actions `Release Windows` construit l'installeur sur un runner Windows et l'attache à la Release correspondante. Il peut aussi être lancé à la main (*Actions → Release Windows → Run workflow*) : l'installeur est alors disponible comme artefact du run.
