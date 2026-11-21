@@ -272,3 +272,41 @@ button:disabled {
 .ragrow button.secondary {
   margin-left: 0;
 }
+
+/* ---------- Bases de connaissances ---------- */
+.kbbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0 8px;
+}
+.kbbar select {
+  flex: 1;
+}
+#kbBrief {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+}
+#kbDocs {
+  max-height: 220px;
+  overflow: auto;
+  margin-top: 6px;
+}
+details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 6px 0;
+}
+.kbbar input[type="text"] { flex: 1; }
+#kbNote {
+  white-space: pre-wrap;
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+}
+#kbDocs .rname {
+  cursor: pointer;
+}

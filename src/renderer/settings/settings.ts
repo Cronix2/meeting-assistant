@@ -5,6 +5,13 @@ import type {
   DiagSnapshot,
   Lang,
   LevelMessage,
+  KbBriefEstimate,
+  KbDocInfo,
+  KbImportResult,
+  KbInfo,
+  KbProgress,
+  KbSummaryEstimate,
+  KbSummaryResult,
   MixerListResult,
   RagChange,
   RagDoc,
@@ -211,6 +218,10 @@ function fill(s: SettingsView): void {
   input('ragEnabled').checked = s.ragEnabled
   $<HTMLTextAreaElement>('ragProfile').value = s.ragProfile
   input('ragTopK').value = String(s.ragTopK)
+  input('kbEnabled').checked = s.kbEnabled
+  input('kbAutoSummary').checked = s.kbAutoSummary
+  input('kbTopK').value = String(s.kbTopK)
+  input('kbBudgetChars').value = String(s.kbBudgetChars)
   input('mixerAutoSonar').checked = s.mixerAutoSonar
   mixerSelected = new Set(s.mixerDevices)
   renderMixerList()
@@ -256,6 +267,10 @@ function collect(): SettingsPatch {
       ragEnabled: input('ragEnabled').checked,
       ragProfile: $<HTMLTextAreaElement>('ragProfile').value,
       ragTopK: Number(input('ragTopK').value),
+      kbEnabled: input('kbEnabled').checked,
+      kbAutoSummary: input('kbAutoSummary').checked,
+      kbTopK: Number(input('kbTopK').value),
+      kbBudgetChars: Number(input('kbBudgetChars').value),
       mixerAutoSonar: input('mixerAutoSonar').checked,
       mixerDevices: [...mixerSelected],
       autoListen: input('autoListen').checked,
@@ -362,6 +377,292 @@ $('ragAdd').addEventListener('click', () => {
   void window.api.invoke<RagChange>('rag:add').then((res) => renderRag(res.docs, res.errors))
 })
 void window.api.invoke<RagDoc[]>('rag:list').then((docs) => renderRag(docs))
+
+// ---------- Mémoire professionnelle : bases de connaissances ----------
+
+let kbList: KbInfo[] = []
+let kbCurrent = ''
+let kbBusy = false
+
+const kbMsg = (text: string, warn = false): void => {
+  const el = $('kbMsg')
+  el.className = warn ? 'warn' : 'note'
+  el.textContent = text
+}
+
+const fmtSize = (chars: number): string =>
+  chars >= 1_000_000 ? `${(chars / 1_000_000).toFixed(1)} M caractères` : `${Math.max(1, Math.round(chars / 1000))} k caractères`
+
+function kbSetBusy(busy: boolean): void {
+  kbBusy = busy
+  for (const id of ['kbAddFiles', 'kbAddFolder', 'kbGen', 'kbSum', 'kbSumAll', 'kbSaveText', 'kbNew', 'kbRename', 'kbDelete']) {
+    $<HTMLButtonElement>(id).disabled = busy
+  }
+  $('kbStop').hidden = !busy
+}
+
+function kbCurrentInfo(): KbInfo | undefined {
+  return kbList.find((b) => b.id === kbCurrent)
+}
+
+function renderKb(): void {
+  const sel = select('kbSelect')
+  sel.innerHTML = ''
+  for (const b of kbList) {
+    const o = document.createElement('option')
+    o.value = b.id
+    o.textContent = `${b.name}${b.enabled ? '' : ' (désactivée)'}`
+    sel.appendChild(o)
+  }
+  if (!kbList.some((b) => b.id === kbCurrent)) kbCurrent = kbList[0]?.id ?? ''
+  sel.value = kbCurrent
+  const cur = kbCurrentInfo()
+  $('kbBody').hidden = !cur
+  $<HTMLButtonElement>('kbRename').disabled = !cur
+  $<HTMLButtonElement>('kbDelete').disabled = !cur
+  if (!cur) {
+    kbMsg('Aucune base pour l’instant : « Nouvelle base… » pour commencer.')
+    return
+  }
+  input('kbActive').checked = cur.enabled
+  const about = $<HTMLTextAreaElement>('kbAbout')
+  if (document.activeElement !== about) about.value = cur.about
+  const brief = $<HTMLTextAreaElement>('kbBrief')
+  if (document.activeElement !== brief) brief.value = cur.brief
+  $('kbStats').textContent =
+    `${cur.docs} fichier(s) · ${cur.summarized} avec note · ${cur.chunks} extraits · ${fmtSize(cur.chars)}` +
+    (cur.indexing ? ' · indexation en cours…' : '') +
+    (cur.brief ? '' : ' · pas encore de fiche de compréhension')
+  $('kbGenNote').textContent = cur.briefAt ? `Fiche du ${new Date(cur.briefAt).toLocaleString('fr-FR')}` : ''
+  void renderKbDocs()
+}
+
+async function renderKbDocs(): Promise<void> {
+  const box = $('kbDocs')
+  const id = kbCurrent
+  if (!id) return
+  const docs = await window.api.invoke<KbDocInfo[]>('kb:docs', id)
+  if (id !== kbCurrent) return
+  box.innerHTML = ''
+  for (const d of docs.slice(0, 300)) {
+    const row = document.createElement('div')
+    row.className = 'ragrow'
+    const name = document.createElement('span')
+    name.className = 'rname'
+    name.textContent = d.label
+    name.title = 'Lire la note de ce fichier'
+    name.addEventListener('click', () => {
+      void window.api.invoke<string>('kb:note', { id, docId: d.id }).then((t) => {
+        const pre = $('kbNote')
+        pre.hidden = false
+        pre.textContent = `${d.label}\n\n${t || '(pas encore de note pour ce fichier)'}`
+      })
+    })
+    const meta = document.createElement('span')
+    meta.className = 'rmeta'
+    meta.textContent = `${d.chunks} extr. · ${Math.max(1, Math.round(d.chars / 1000))} k`
+    const del = document.createElement('button')
+    del.type = 'button'
+    del.className = 'secondary'
+    del.textContent = 'Retirer'
+    del.addEventListener('click', () => {
+      void window.api.invoke<KbInfo[]>('kb:removeDoc', { id, docId: d.id }).then((l) => {
+        kbList = l
+        renderKb()
+      })
+    })
+    row.append(name, meta, del)
+    box.appendChild(row)
+  }
+  if (docs.length > 300) {
+    const more = document.createElement('p')
+    more.className = 'note'
+    more.textContent = `… et ${docs.length - 300} autres fichiers (non listés).`
+    box.appendChild(more)
+  }
+}
+
+async function refreshKb(): Promise<void> {
+  kbList = await window.api.invoke<KbInfo[]>('kb:list')
+  renderKb()
+}
+
+select('kbSelect').addEventListener('change', () => {
+  kbCurrent = select('kbSelect').value
+  renderKb()
+})
+
+$('kbNew').addEventListener('click', () => {
+  const name = input('kbName').value.trim()
+  if (!name) {
+    kbMsg('Écris d’abord le nom de la base dans le champ ci-dessus.', true)
+    input('kbName').focus()
+    return
+  }
+  void window.api.invoke<KbInfo>('kb:create', name).then(async (b) => {
+    kbCurrent = b.id
+    input('kbName').value = ''
+    await refreshKb()
+    kbMsg(`Base « ${b.name} » créée : ajoute-y des fichiers ou un dossier.`)
+  })
+})
+
+$('kbRename').addEventListener('click', () => {
+  const cur = kbCurrentInfo()
+  const name = input('kbName').value.trim()
+  if (!cur) return
+  if (!name) {
+    kbMsg('Écris le nouveau nom dans le champ ci-dessus.', true)
+    input('kbName').focus()
+    return
+  }
+  input('kbName').value = ''
+  void window.api.invoke('kb:update', { id: cur.id, patch: { name } }).then(refreshKb)
+})
+
+$('kbDelete').addEventListener('click', () => {
+  const cur = kbCurrentInfo()
+  if (!cur) return
+  if (!window.confirm(`Supprimer la base « ${cur.name} » et tous ses fichiers indexés ? (tes fichiers d'origine ne sont pas touchés)`)) return
+  void window.api.invoke<KbInfo[]>('kb:delete', cur.id).then((l) => {
+    kbList = l
+    renderKb()
+  })
+})
+
+input('kbActive').addEventListener('change', () => {
+  const cur = kbCurrentInfo()
+  if (!cur) return
+  void window.api.invoke('kb:update', { id: cur.id, patch: { enabled: input('kbActive').checked } }).then(refreshKb)
+})
+
+$('kbSaveText').addEventListener('click', () => {
+  const cur = kbCurrentInfo()
+  if (!cur) return
+  void window.api
+    .invoke('kb:update', {
+      id: cur.id,
+      patch: { about: $<HTMLTextAreaElement>('kbAbout').value, brief: $<HTMLTextAreaElement>('kbBrief').value }
+    })
+    .then(async () => {
+      await refreshKb()
+      kbMsg('Présentation et fiche enregistrées.')
+    })
+})
+
+const AUTO_SUMMARY_MAX_TOKENS = 150_000
+
+/** Lance les notes par fichier ; demande confirmation si c'est demandé ou si le volume est important. */
+async function kbSummarize(id: string, name: string, ask: boolean): Promise<void> {
+  if (kbBusy) return
+  const est = await window.api.invoke<KbSummaryEstimate>('kb:sumEstimate', id)
+  if (!est.files) {
+    kbMsg('Tous les fichiers ont déjà une note.')
+    return
+  }
+  if (ask || est.approxTokens > AUTO_SUMMARY_MAX_TOKENS) {
+    const k = Math.round(est.approxTokens / 1000)
+    const ok = window.confirm(
+      `Claude va résumer ${est.files} fichier(s) de « ${name} » : environ ${k} 000 tokens envoyés en ${est.calls} appel(s) (modèle des Réglages). ` +
+        'Cela consomme des crédits de ta clé Claude. Continuer ?'
+    )
+    if (!ok) return
+  }
+  kbSetBusy(true)
+  try {
+    const res = await window.api.invoke<KbSummaryResult>('kb:summarize', id)
+    await refreshKb()
+    kbMsg(res.message ?? (res.ok ? 'Notes créées.' : 'Échec.'), !res.ok)
+  } finally {
+    kbSetBusy(false)
+  }
+}
+
+async function kbImport(mode: 'files' | 'folder'): Promise<void> {
+  const cur = kbCurrentInfo()
+  if (!cur || kbBusy) return
+  kbSetBusy(true)
+  kbMsg('')
+  let added = 0
+  try {
+    const res = await window.api.invoke<KbImportResult | null>('kb:import', { id: cur.id, mode })
+    await refreshKb()
+    if (!res) return
+    added = res.added
+    const parts = [`${res.added} ajouté(s)`]
+    if (res.unchanged) parts.push(`${res.unchanged} déjà à jour`)
+    if (res.skipped) parts.push(`${res.skipped} ignoré(s) (binaires, doublons, vides)`)
+    if (res.truncated) parts.push('dossier très volumineux : arrêt à 25 000 fichiers')
+    kbMsg(`${parts.join(' · ')}${res.errors.length ? ` — ${res.errors.length} erreur(s) : ${res.errors.slice(0, 3).join(' | ')}` : ''}`, res.errors.length > 0)
+  } catch (e) {
+    kbMsg(e instanceof Error ? e.message : String(e), true)
+  } finally {
+    kbSetBusy(false)
+  }
+  // Notes par fichier juste après l'import (si l'option est cochée).
+  if (added > 0 && input('kbAutoSummary').checked) await kbSummarize(cur.id, cur.name, false)
+}
+$('kbAddFiles').addEventListener('click', () => void kbImport('files'))
+$('kbAddFolder').addEventListener('click', () => void kbImport('folder'))
+$('kbStop').addEventListener('click', () => {
+  if (kbCurrent) void window.api.invoke('kb:cancel', kbCurrent)
+})
+
+$('kbSum').addEventListener('click', () => {
+  const cur = kbCurrentInfo()
+  if (cur) void kbSummarize(cur.id, cur.name, true)
+})
+$('kbSumAll').addEventListener('click', () => {
+  const cur = kbCurrentInfo()
+  if (!cur || kbBusy) return
+  if (!window.confirm('Effacer toutes les notes de cette base puis les refaire avec Claude ?')) return
+  void window.api.invoke<KbInfo[]>('kb:clearNotes', cur.id).then(async (l) => {
+    kbList = l
+    renderKb()
+    await kbSummarize(cur.id, cur.name, true)
+  })
+})
+
+$('kbGen').addEventListener('click', () => {
+  const cur = kbCurrentInfo()
+  if (!cur || kbBusy) return
+  void (async () => {
+    if (cur.indexing || cur.docs === 0) {
+      kbMsg(cur.docs === 0 ? 'Ajoute d’abord des fichiers à la base.' : 'L’indexation est encore en cours, réessaie dans un instant.', true)
+      return
+    }
+    const est = await window.api.invoke<KbBriefEstimate>('kb:estimate', cur.id)
+    const k = Math.round(est.approxTokens / 1000)
+    const ok = window.confirm(
+      `Claude va lire ${est.sampled ? 'un échantillon représentatif de ' : ''}la base « ${cur.name} » : environ ${k} 000 tokens envoyés en ${est.calls} appel(s) (modèle des Réglages). ` +
+        `Cela consomme des crédits de ta clé Claude. Continuer ?${cur.brief.trim() ? '\n\nLa fiche actuelle sera remplacée.' : ''}`
+    )
+    if (!ok) return
+    kbSetBusy(true)
+    kbMsg('')
+    try {
+      const res = await window.api.invoke<{ ok: boolean; message?: string }>('kb:brief', cur.id)
+      await refreshKb()
+      kbMsg(res.ok ? 'Fiche de compréhension générée : relis-la et corrige-la si besoin, elle est transmise à chaque demande.' : (res.message ?? 'Échec.'), !res.ok)
+    } finally {
+      kbSetBusy(false)
+    }
+  })()
+})
+
+window.api.on('kb:progress', (p: KbProgress) => {
+  const el = $('kbProgress')
+  if (p.kbId !== kbCurrent) return
+  if (p.finished) {
+    el.textContent = p.message ?? ''
+    void refreshKb()
+    return
+  }
+  const what = p.task === 'import' ? 'Import' : p.task === 'index' ? 'Indexation' : p.task === 'summary' ? 'Notes par fichier' : 'Synthèse'
+  el.textContent = `${what} : ${p.done}/${p.total}${p.label ? ` — ${p.label}` : ''}`
+})
+
+void refreshKb()
 
 // ---------- Diagnostic en direct ----------
 

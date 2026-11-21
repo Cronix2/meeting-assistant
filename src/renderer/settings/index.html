@@ -180,6 +180,78 @@
         <p class="note" id="ragNote"></p>
       </section>
 
+      <section id="kbSection">
+        <h2>Mémoire professionnelle (bases de connaissances)</h2>
+        <p class="note">
+          Pour les sujets de travail : un <b>projet de code</b>, des cours, des textes de loi, des PDF, des notes…
+          Crée une base, ajoute-y des <b>fichiers ou des dossiers entiers</b> (code, PDF, Word, PowerPoint, Markdown,
+          texte, notebooks, HTML…). Tout est lu et indexé <b>sur ce PC</b>, même pour de gros volumes. À chaque demande,
+          les extraits les plus proches de la conversation sont retrouvés et ajoutés au message envoyé à Claude, avec
+          la <b>fiche de compréhension</b> de la base (ci-dessous) : c'est ce qui permet de répondre à
+          « pourquoi tu as fait cette fonction comme ça ? ».
+        </p>
+        <label class="inline"><input id="kbEnabled" type="checkbox" /> Utiliser les bases de connaissances dans les réponses</label>
+        <label class="inline">
+          <input id="kbAutoSummary" type="checkbox" /> Résumer chaque fichier avec Claude à l'import (une « note » par fichier : rôle,
+          éléments, choix, mots-clés — elle permet de retrouver le bon fichier même si la question n'emploie pas ses mots)
+        </label>
+        <div class="grid">
+          <label>
+            Passages de fichiers par demande (1 – 20)
+            <input id="kbTopK" type="number" min="1" max="20" step="1" />
+          </label>
+          <label>
+            Taille max des extraits (caractères)
+            <input id="kbBudgetChars" type="number" min="2000" max="40000" step="1000" />
+          </label>
+        </div>
+        <div class="kbbar">
+          <select id="kbSelect"></select>
+          <button type="button" id="kbDelete" class="secondary">Supprimer</button>
+        </div>
+        <div class="kbbar">
+          <input id="kbName" type="text" maxlength="80" placeholder="Nom : « Projet DNS Relay », « Code du travail », « Cours crypto »…" />
+          <button type="button" id="kbNew" class="secondary">Créer une base</button>
+          <button type="button" id="kbRename" class="secondary">Renommer la base choisie</button>
+        </div>
+        <div id="kbBody" hidden>
+          <label class="inline"><input id="kbActive" type="checkbox" /> Base active</label>
+          <label>
+            Présentation (toujours transmise) — dis qui tu es par rapport à ce contenu
+            <textarea
+              id="kbAbout"
+              rows="3"
+              spellcheck="false"
+              placeholder="Ex. : C'est mon projet DNS Relay, que j'ai écrit seul en Go pendant mon alternance chez … Il sert à … Je dois pouvoir expliquer chaque choix technique."
+            ></textarea>
+          </label>
+          <p class="note">
+            <button type="button" id="kbAddFiles" class="secondary">Ajouter des fichiers…</button>
+            <button type="button" id="kbAddFolder" class="secondary">Ajouter un dossier…</button>
+            <button type="button" id="kbSum" class="secondary">Résumer les fichiers (notes)</button>
+            <button type="button" id="kbSumAll" class="secondary">Refaire toutes les notes</button>
+            <button type="button" id="kbStop" class="secondary" hidden>Annuler</button>
+          </p>
+          <p class="note" id="kbProgress"></p>
+          <div id="kbStats" class="note"></div>
+          <label>
+            Fiche de compréhension (toujours transmise, modifiable)
+            <textarea id="kbBrief" rows="10" spellcheck="false" placeholder="Vide : clique sur « Générer la fiche » pour que Claude lise la base et en fasse la synthèse (architecture, éléments clés, choix et raisons, questions probables)."></textarea>
+          </label>
+          <p class="note">
+            <button type="button" id="kbGen" class="secondary">Générer la fiche avec Claude</button>
+            <button type="button" id="kbSaveText" class="secondary">Enregistrer présentation et fiche</button>
+            <span id="kbGenNote"></span>
+          </p>
+          <details>
+            <summary>Fichiers de la base (clique sur un nom pour lire sa note)</summary>
+            <div id="kbDocs"></div>
+            <pre id="kbNote" class="note" hidden></pre>
+          </details>
+        </div>
+        <p class="note" id="kbMsg"></p>
+      </section>
+
       <section>
         <h2>Déclenchement</h2>
         <div class="grid">

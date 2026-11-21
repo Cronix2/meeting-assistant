@@ -49,6 +49,10 @@ export function sanitize(s: Settings): Settings {
     ragEnabled: bool(s.ragEnabled, d.ragEnabled),
     ragProfile: typeof s.ragProfile === 'string' ? s.ragProfile.slice(0, 8000) : d.ragProfile,
     ragTopK: Math.round(clamp(s.ragTopK, 1, 10, d.ragTopK)),
+    kbEnabled: bool(s.kbEnabled, d.kbEnabled),
+    kbTopK: Math.round(clamp(s.kbTopK, 1, 20, d.kbTopK)),
+    kbAutoSummary: bool(s.kbAutoSummary, d.kbAutoSummary),
+    kbBudgetChars: Math.round(clamp(s.kbBudgetChars, 2000, 40000, d.kbBudgetChars)),
     mixerAutoSonar: bool(s.mixerAutoSonar, d.mixerAutoSonar),
     mixerDevices: Array.isArray(s.mixerDevices)
       ? [...new Set(s.mixerDevices.filter((x): x is string => typeof x === 'string' && x.length > 0))].slice(0, 32)

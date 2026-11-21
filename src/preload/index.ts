@@ -23,7 +23,21 @@ const INVOKE = new Set([
   'diag:toggleListening',
   'rag:list',
   'rag:add',
-  'rag:remove'
+  'rag:remove',
+  'kb:list',
+  'kb:create',
+  'kb:update',
+  'kb:delete',
+  'kb:docs',
+  'kb:removeDoc',
+  'kb:cancel',
+  'kb:import',
+  'kb:estimate',
+  'kb:sumEstimate',
+  'kb:summarize',
+  'kb:note',
+  'kb:clearNotes',
+  'kb:brief'
 ])
 const ON = new Set([
   'state',
@@ -31,6 +45,7 @@ const ON = new Set([
   'log',
   'perf',
   'prefs',
+  'kb:progress',
   'transcript:partial',
   'transcript:committed',
   'answer:start',
