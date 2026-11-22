@@ -979,3 +979,10 @@ kbd {
     transition: none !important;
   }
 }
+.okmsg {
+  color: var(--ok);
+}
+#importInfo {
+  margin: 0 0 10px;
+  font-size: 13px;
+}

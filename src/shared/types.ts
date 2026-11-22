@@ -265,3 +265,28 @@ export interface Api {
   invoke<T = unknown>(channel: string, payload?: unknown): Promise<T>
   on(channel: string, cb: (payload: any) => void): () => void
 }
+
+// ---------- Transfert des données entre deux PC ----------
+
+export interface DataExportResult {
+  ok: boolean
+  canceled?: boolean
+  message?: string
+  path?: string
+  bytes?: number
+  /** Les clés API sont incluses (export) / ont été restaurées (import) */
+  keys?: boolean
+  /** Dossier de la copie de sécurité faite avant l'import */
+  backup?: string
+}
+
+export interface DataImportInfo {
+  ok: boolean
+  file: string
+  name: string
+  message?: string
+  encrypted?: boolean
+  created?: number
+  appVersion?: string
+  summary?: { settings: boolean; profileDocs: number; bases: number; baseFiles: number; keys: boolean }
+}

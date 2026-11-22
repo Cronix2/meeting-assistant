@@ -24,6 +24,7 @@
         <a href="#moi" data-nav="moi">Mon profil</a>
         <a href="#pro" data-nav="pro">Documents de travail</a>
         <a href="#fenetre" data-nav="fenetre">Fenêtre et raccourcis</a>
+        <a href="#transfert" data-nav="transfert">Sauvegarde et transfert</a>
         <a href="#diag" data-nav="diag">Diagnostic <i class="dot" id="navDiag"></i></a>
         <button type="button" id="tourStart" class="tour-btn">Visite guidée</button>
       </nav>
@@ -516,6 +517,70 @@
               <input id="launchAtStartup" type="checkbox" /><span>Lancer avec Windows (version installée)</span>
             </label>
           </div>
+        </section>
+
+        <!-- ============ Sauvegarde et transfert ============ -->
+        <section class="page" id="page-transfert" data-page="transfert" hidden>
+          <header class="page-head">
+            <h1>Sauvegarde et transfert</h1>
+            <p>
+              Pour passer d'un PC à l'autre (par exemple du fixe au portable) ou garder une sauvegarde : tout tient
+              dans un seul fichier. Exporte-le ici, copie-le (clé USB, cloud…), puis importe-le sur l'autre PC.
+            </p>
+          </header>
+
+          <ol class="kbsteps">
+            <li>
+              <h3>Sur ce PC : exporter</h3>
+              <p class="hint">
+                Contient tes réglages, ton profil et tes documents perso, tes bases de documents de travail (avec
+                notes et fiches). Les fichiers d'origine (ton code, tes PDF) ne sont pas copiés, seulement leur texte.
+              </p>
+              <div class="field" data-help="exportPassword">
+                <label for="exportPassword">Mot de passe du fichier <span class="opt">recommandé</span></label>
+                <p class="hint">Chiffre le fichier. Il te sera demandé à l'import. 8 caractères minimum.</p>
+                <div class="row2">
+                  <input id="exportPassword" type="password" autocomplete="new-password" placeholder="Mot de passe" />
+                  <input id="exportPassword2" type="password" autocomplete="new-password" placeholder="Le même, pour confirmer" />
+                </div>
+              </div>
+              <div class="field" data-help="exportKeys">
+                <label class="switch">
+                  <input id="exportKeys" type="checkbox" />
+                  <span>Inclure mes clés API (nécessite un mot de passe)</span>
+                </label>
+              </div>
+              <div class="btnrow">
+                <button type="button" id="exportBtn" class="secondary">Exporter vers un fichier</button>
+              </div>
+              <p class="hint" id="exportMsg"></p>
+            </li>
+
+            <li>
+              <h3>Sur l'autre PC : importer</h3>
+              <div class="field" data-help="importFile">
+                <p class="hint">
+                  Remplace toutes les données de ce PC par celles du fichier. Une copie de sécurité des données
+                  actuelles est faite avant, puis l'appli redémarre.
+                </p>
+                <div class="btnrow">
+                  <button type="button" id="importPick" class="secondary">Choisir un fichier .deskassistant</button>
+                </div>
+              </div>
+              <div id="importCard" class="subpanel" hidden>
+                <p id="importInfo"></p>
+                <div class="field" id="importPwBox" hidden>
+                  <label for="importPassword">Mot de passe du fichier</label>
+                  <input id="importPassword" type="password" autocomplete="off" />
+                </div>
+                <div class="btnrow">
+                  <button type="button" id="importGo" class="secondary danger">Remplacer mes données et redémarrer</button>
+                  <button type="button" id="importCancel" class="link">Annuler</button>
+                </div>
+              </div>
+              <p class="hint" id="importMsg"></p>
+            </li>
+          </ol>
         </section>
 
         <!-- ============ Diagnostic ============ -->

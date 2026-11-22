@@ -263,6 +263,24 @@ export const HELP: Record<string, HelpEntry> = {
     what: "L'appli démarre en même temps que Windows (version installée uniquement)."
   },
 
+  // ----- Transfert -----
+  exportPassword: {
+    title: 'Mot de passe du fichier',
+    what: "Chiffre le fichier d'export (AES-256). Sans le mot de passe, personne ne peut lire ton profil, tes documents ni tes clés.",
+    fill: "Un mot de passe que tu retiendras pendant le transfert. Il n'est enregistré nulle part : s'il est perdu, le fichier est illisible.",
+    example: 'Une phrase de quatre mots, ex. « portable-oral-mardi-matin »'
+  },
+  exportKeys: {
+    title: 'Inclure les clés API',
+    what: "Les clés ElevenLabs et Claude sont ajoutées au fichier, chiffrées avec ton mot de passe. Sur l'autre PC, tu n'auras rien à recoller.",
+    fill: 'Active-le seulement avec un mot de passe solide. Sans clés, il suffit de les recoller dans la page Clés API après l’import.'
+  },
+  importFile: {
+    title: 'Importer',
+    what: "Remplace les réglages, le profil et les bases de ce PC par ceux du fichier. Les choix de sortie audio sont remis par défaut car ils dépendent de chaque PC.",
+    fill: "Choisis le fichier .deskassistant exporté sur l'autre PC. Une copie de sécurité est faite dans le dossier de l'appli (backups) avant de remplacer quoi que ce soit."
+  },
+
   // ----- Diagnostic -----
   diagState: {
     title: 'État de l’écoute',
@@ -314,6 +332,8 @@ export const TOUR: TourStep[] = [
   { page: 'pro', help: 'kbNotes' },
   { page: 'fenetre', help: 'hkAsk' },
   { page: 'fenetre', help: 'contentProtection' },
+  { page: 'transfert', help: 'exportPassword' },
+  { page: 'transfert', help: 'importFile' },
   { page: 'diag', help: 'meters' },
   {
     page: 'diag',
