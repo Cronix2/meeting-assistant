@@ -37,7 +37,10 @@ const INVOKE = new Set([
   'kb:summarize',
   'kb:note',
   'kb:clearNotes',
-  'kb:brief'
+  'kb:brief',
+  'data:export',
+  'data:pickImport',
+  'data:import'
 ])
 const ON = new Set([
   'state',

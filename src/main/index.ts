@@ -1,3 +1,4 @@
+import fs from 'node:fs'
 import path from 'node:path'
 import { BrowserWindow, Menu, app, desktopCapturer, dialog, ipcMain, session } from 'electron'
 import type {
@@ -12,6 +13,8 @@ import type {
   KbPatch,
   KbSummaryEstimate,
   KbSummaryResult,
+  DataExportResult,
+  DataImportInfo,
   LevelMessage,
   MixerListResult,
   OverlayPrefsMessage,
@@ -61,6 +64,15 @@ import {
   setSecret
 } from './settings'
 import { registerShortcuts, unregisterAllShortcuts } from './shortcuts'
+import {
+  MIN_PASSWORD,
+  backupData,
+  buildExport,
+  collectEntries,
+  openExport,
+  readHeader,
+  writeImport
+} from './transfer'
 import { createTray, type TrayHandle } from './tray'
 import {
   createCaptureWindow,
@@ -406,6 +418,7 @@ function registerIpc(): void {
   })
   ipcMain.handle('rag:remove', (_e, id: string): RagDoc[] => removeDoc(String(id)))
   registerKnowledgeIpc()
+  registerTransferIpc()
   ipcMain.handle('settings:get', (): SettingsView => currentView())
   ipcMain.handle('settings:save', (_e, patch: SettingsPatch) => handleSave(patch))
 }
@@ -420,6 +433,99 @@ function startKbJob(id: string, kind: 'import' | 'brief' | 'summary') {
   const job = { kind, flag: { aborted: false }, abort: new AbortController() }
   kbJobs.set(id, job)
   return job
+}
+
+// ---------- Transfert des données vers un autre PC ----------
+
+function registerTransferIpc(): void {
+  const dataDir = () => app.getPath('userData')
+  const parent = () => getSettingsWindow() ?? undefined
+
+  ipcMain.handle('data:export', async (_e, o: { password?: string; includeKeys?: boolean }): Promise<DataExportResult> => {
+    try {
+      const password = typeof o?.password === 'string' && o.password ? o.password : undefined
+      if (password && password.length < MIN_PASSWORD) return { ok: false, message: `Mot de passe trop court (${MIN_PASSWORD} caractères minimum).` }
+      if (o?.includeKeys && !password) return { ok: false, message: 'Choisis un mot de passe pour exporter les clés API.' }
+      const stamp = new Date().toISOString().slice(0, 10)
+      const opts: Electron.SaveDialogOptions = {
+        title: 'Exporter les données de Desk Assistant',
+        defaultPath: path.join(app.getPath('documents'), `desk-assistant-${stamp}.deskassistant`),
+        filters: [{ name: 'Export Desk Assistant', extensions: ['deskassistant'] }]
+      }
+      const w = parent()
+      const res = w ? await dialog.showSaveDialog(w, opts) : await dialog.showSaveDialog(opts)
+      if (res.canceled || !res.filePath) return { ok: false, canceled: true }
+      const entries = collectEntries(dataDir()).map((e) => ({ name: e.name, data: fs.readFileSync(e.file) }))
+      let secrets: Record<string, string> | undefined
+      if (o?.includeKeys) {
+        secrets = {}
+        for (const k of ['elevenlabs', 'anthropic'] as const) {
+          const v = getSecret(k)
+          if (v) secrets[k] = v
+        }
+      }
+      const buf = buildExport({ entries, appVersion: app.getVersion(), password, secrets, ragDocs: listDocs().length })
+      fs.writeFileSync(res.filePath, buf)
+      log(`[transfert] export écrit (${Math.round(buf.length / 1024)} Ko, ${password ? 'chiffré' : 'non chiffré'}${secrets ? ', avec les clés' : ''})`)
+      return { ok: true, path: res.filePath, bytes: buf.length, keys: !!secrets && Object.keys(secrets).length > 0 }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) }
+    }
+  })
+
+  ipcMain.handle('data:pickImport', async (): Promise<DataImportInfo | null> => {
+    const opts: Electron.OpenDialogOptions = {
+      title: 'Importer des données Desk Assistant',
+      properties: ['openFile'],
+      filters: [{ name: 'Export Desk Assistant', extensions: ['deskassistant'] }]
+    }
+    const w = parent()
+    const res = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
+    if (res.canceled || !res.filePaths[0]) return null
+    const file = res.filePaths[0]
+    try {
+      const fd = fs.openSync(file, 'r')
+      const head = Buffer.alloc(8192)
+      const n = fs.readSync(fd, head, 0, head.length, 0)
+      fs.closeSync(fd)
+      const { header } = readHeader(head.subarray(0, n))
+      return { ok: true, file, name: path.basename(file), encrypted: header.encrypted, created: header.created, appVersion: header.appVersion, summary: header.summary }
+    } catch (e) {
+      return { ok: false, file, name: path.basename(file), message: e instanceof Error ? e.message : String(e) }
+    }
+  })
+
+  ipcMain.handle('data:import', async (_e, o: { file: string; password?: string }): Promise<DataExportResult> => {
+    try {
+      const file = String(o?.file ?? '')
+      if (!file.toLowerCase().endsWith('.deskassistant')) return { ok: false, message: 'Fichier invalide.' }
+      const opened = openExport(fs.readFileSync(file), o?.password || undefined)
+      const backup = backupData(dataDir())
+      writeImport(dataDir(), opened.entries, (json) => {
+        // Les périphériques audio sont propres à chaque PC : on repart sur une configuration qui marche partout.
+        const s = JSON.parse(json) as Record<string, unknown>
+        if (s['audioSource'] !== 'loopback' && s['audioSource'] !== 'mixer') s['audioSource'] = 'loopback'
+        s['mixerDevices'] = []
+        return JSON.stringify(s, null, 2)
+      })
+      let keys = false
+      if (opened.secrets) {
+        for (const k of ['elevenlabs', 'anthropic'] as const) {
+          const v = opened.secrets[k]
+          if (v && setSecret(k, v)) keys = true
+        }
+      }
+      log(`[transfert] import terminé (sauvegarde précédente : ${backup}) ; redémarrage`)
+      // Redémarrage : toutes les données (réglages, mémoire, bases) sont rechargées proprement.
+      setTimeout(() => {
+        app.relaunch()
+        app.exit(0)
+      }, 1200)
+      return { ok: true, keys, backup }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : String(e) }
+    }
+  })
 }
 
 function registerKnowledgeIpc(): void {

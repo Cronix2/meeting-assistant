@@ -13,6 +13,8 @@ import type {
   KbProgress,
   KbSummaryEstimate,
   KbSummaryResult,
+  DataExportResult,
+  DataImportInfo,
   MixerListResult,
   RagChange,
   RagDoc,
@@ -32,7 +34,7 @@ const saveBtn = $<HTMLButtonElement>('save')
 
 // ---------- Navigation entre les pages ----------
 
-const PAGES = ['accueil', 'cles', 'ecoute', 'reponses', 'moi', 'pro', 'fenetre', 'diag']
+const PAGES = ['accueil', 'cles', 'ecoute', 'reponses', 'moi', 'pro', 'fenetre', 'transfert', 'diag']
 
 function showPage(name: string): void {
   if (!PAGES.includes(name)) name = 'accueil'
@@ -93,7 +95,7 @@ function setDirty(on: boolean): void {
   if (on) say('')
 }
 // Champs qui ne passent pas par « Enregistrer » (actions immédiates) : exclus.
-const IMMEDIATE = new Set(['kbSelect', 'kbName', 'kbAbout', 'kbBrief', 'kbActive'])
+const IMMEDIATE = new Set(['kbSelect', 'kbName', 'kbAbout', 'kbBrief', 'kbActive', 'exportPassword', 'exportPassword2', 'exportKeys', 'importPassword'])
 $('form').addEventListener('input', (e) => {
   const id = (e.target as HTMLElement).id
   if (!IMMEDIATE.has(id)) setDirty(true)
@@ -780,6 +782,85 @@ window.api.on('kb:progress', (p: KbProgress) => {
 })
 
 void refreshKb()
+
+// ---------- Sauvegarde et transfert ----------
+
+const fmtBytes = (n: number): string => (n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`)
+function setMsg(id: string, text: string, kind: '' | 'ok' | 'err' = ''): void {
+  const el = $(id)
+  el.textContent = text
+  el.className = `hint ${kind === 'err' ? 'warn' : kind === 'ok' ? 'okmsg' : ''}`
+}
+
+$('exportBtn').addEventListener('click', () => {
+  const pw = input('exportPassword').value
+  const pw2 = input('exportPassword2').value
+  const includeKeys = input('exportKeys').checked
+  if (pw !== pw2) return setMsg('exportMsg', 'Les deux mots de passe sont différents.', 'err')
+  if (pw && pw.length < 8) return setMsg('exportMsg', 'Mot de passe trop court : 8 caractères minimum.', 'err')
+  if (includeKeys && !pw) return setMsg('exportMsg', 'Pour inclure les clés API, choisis un mot de passe.', 'err')
+  if (dirty) setMsg('exportMsg', 'Attention : tes dernières modifications ne sont pas enregistrées, elles ne seront pas dans le fichier.', 'err')
+  const btn = $<HTMLButtonElement>('exportBtn')
+  btn.disabled = true
+  void window.api
+    .invoke<DataExportResult>('data:export', { password: pw || undefined, includeKeys })
+    .then((r) => {
+      if (r.canceled) return
+      if (!r.ok) return setMsg('exportMsg', r.message ?? 'Export impossible.', 'err')
+      input('exportPassword').value = ''
+      input('exportPassword2').value = ''
+      setMsg(
+        'exportMsg',
+        `Fichier exporté (${fmtBytes(r.bytes ?? 0)}) : ${r.path}. ${pw ? 'Il est chiffré' : "Il n'est pas chiffré : garde-le pour toi"}${r.keys ? ', clés API incluses' : ''}.`,
+        'ok'
+      )
+    })
+    .finally(() => (btn.disabled = false))
+})
+
+let importFile = ''
+$('importPick').addEventListener('click', () => {
+  void window.api.invoke<DataImportInfo | null>('data:pickImport').then((info) => {
+    if (!info) return
+    if (!info.ok) {
+      $('importCard').hidden = true
+      return setMsg('importMsg', `${info.name} : ${info.message ?? 'fichier illisible'}.`, 'err')
+    }
+    importFile = info.file
+    setMsg('importMsg', '')
+    const date = info.created ? new Date(info.created).toLocaleString('fr-FR') : '?'
+    const s = info.summary
+    const content = s
+      ? ` Contenu : réglages, ${s.profileDocs} document(s) perso, ${s.bases} base(s) de documents de travail (${s.baseFiles} fichier(s)).`
+      : ' Fichier chiffré : entre son mot de passe ci-dessous.'
+    $('importInfo').textContent = `${info.name}, exporté le ${date} (version ${info.appVersion ?? '?'}).${content}`
+    $('importPwBox').hidden = !info.encrypted
+    input('importPassword').value = ''
+    $('importCard').hidden = false
+    if (info.encrypted) input('importPassword').focus()
+  })
+})
+$('importCancel').addEventListener('click', () => {
+  importFile = ''
+  $('importCard').hidden = true
+})
+$('importGo').addEventListener('click', () => {
+  if (!importFile) return
+  if (!window.confirm('Remplacer toutes les données de ce PC par celles du fichier ? Une copie de sécurité est faite avant, puis l’appli redémarre.')) return
+  const btn = $<HTMLButtonElement>('importGo')
+  btn.disabled = true
+  void window.api
+    .invoke<DataExportResult>('data:import', { file: importFile, password: input('importPassword').value || undefined })
+    .then((r) => {
+      if (!r.ok) {
+        btn.disabled = false
+        return setMsg('importMsg', r.message ?? 'Import impossible.', 'err')
+      }
+      setDirty(false)
+      $('importCard').hidden = true
+      setMsg('importMsg', `Import réussi${r.keys ? ', clés API comprises' : ' (pense à recoller tes clés API)'}. Redémarrage…`, 'ok')
+    })
+})
 
 // ---------- Diagnostic en direct ----------
 

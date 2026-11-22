@@ -7,8 +7,9 @@ const dot = $('dot')
 const statusEl = $('status')
 const answerEl = $('answer')
 const liveEl = $('live')
-const modeBtn = $<HTMLButtonElement>('mode')
+const modeSeg = $('mode')
 const listenBtn = $<HTMLButtonElement>('listen')
+const askBtn = $<HTMLButtonElement>('ask')
 
 let hotkeys = { toggle: '', ask: '', clear: '' }
 let current = '' // réponse en cours d'affichage
@@ -30,7 +31,8 @@ function render(text: string): string {
     const t = raw.trim()
     if (!t) continue
     const bullet = /^[-*•]\s+(.*)$/.exec(t)
-    if (bullet) html.push(`<div class="bullet">${fmt(bullet[1])}</div>`)
+    if (bullet && !bullet[1].startsWith('ℹ')) html.push(`<div class="bullet">${fmt(bullet[1])}</div>`)
+    else if (bullet) html.push(`<div class="miss">${fmt(bullet[1])}</div>`)
     else if (t.startsWith('ℹ')) html.push(`<div class="miss">${fmt(t)}</div>`)
     else html.push(`<div class="para">${fmt(t)}</div>`)
   }
@@ -43,11 +45,19 @@ function showAnswer(text: string, cls = ''): void {
   answerEl.scrollTop = answerEl.scrollHeight
 }
 
+const kbd = (k: string) =>
+  k
+    .split('+')
+    .map((p) => `<kbd>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</kbd>`)
+    .join('+')
+
 function showHint(): void {
   const k = hotkeys
-  const keys = k.ask ? `<b>${k.ask}</b>` : 'le raccourci'
   answerEl.className = 'hint'
-  answerEl.innerHTML = `Je transcris l'audio de tes applications en continu.<br>Appuie sur ${keys} (ou ⚡) pour obtenir une réponse.`
+  answerEl.innerHTML =
+    `<p>J'écoute le son de tes applications et je transcris en continu.</p>` +
+    `<p>Pour une réponse : ${k.ask ? kbd(k.ask) : 'le raccourci'} ou le bouton <b>Répondre</b>.</p>` +
+    (k.toggle ? `<p>Masquer ou afficher cette fenêtre : ${kbd(k.toggle)}</p>` : '')
 }
 
 function setLive(text: string, partial: boolean): void {
@@ -61,39 +71,64 @@ function setLive(text: string, partial: boolean): void {
 // ---------- État ----------
 
 function applyState(s: AppState): void {
-  modeBtn.textContent = s.mode === 'auto' ? 'auto' : 'manuel'
-  modeBtn.classList.toggle('auto', s.mode === 'auto')
-  listenBtn.textContent = s.listening ? '⏸' : '▶'
+  modeSeg.querySelectorAll<HTMLButtonElement>('button').forEach((b) => {
+    const on = b.dataset['mode'] === s.mode
+    b.classList.toggle('on', on)
+    b.setAttribute('aria-pressed', String(on))
+  })
+  listenBtn.classList.toggle('paused', !s.listening)
+  listenBtn.querySelector('use')?.setAttribute('href', s.listening ? '#i-pause' : '#i-play')
+  listenBtn.title = s.listening ? "Mettre l'écoute en pause" : "Reprendre l'écoute"
+  listenBtn.setAttribute('aria-label', s.listening ? 'Pause' : 'Reprendre')
 
+  // Libellé court dans la barre, détail au survol ; une erreur s'affiche en entier dans la zone de réponse.
   let cls = ''
-  let text = ''
-  if (s.capture === 'error' || (s.stt === 'error' && s.message)) {
+  let label = ''
+  let detail = ''
+  const isErr = s.capture === 'error' || (s.stt === 'error' && !!s.message)
+  if (isErr) {
     cls = 'err'
-    text = s.message ?? 'Erreur'
+    label = 'Erreur'
+    detail = s.message ?? 'Erreur'
   } else if (!s.listening) {
-    text = 'En pause'
+    label = 'En pause'
+    detail = "L'écoute est en pause"
   } else if (s.stt === 'connecting') {
     cls = 'warn'
-    text = 'Connexion à la transcription…'
+    label = 'Connexion…'
+    detail = 'Connexion à la transcription…'
   } else if (s.stt === 'ready') {
     cls = 'ok'
-    text = 'Transcription en cours'
+    label = 'En direct'
+    detail = 'Transcription en cours'
   } else {
     cls = 'ok'
-    text = 'À l’écoute'
+    label = 'À l’écoute'
+    detail = 'En attente de son'
   }
   dot.className = `dot ${cls}`
   statusEl.className = cls === 'err' ? 'err' : ''
-  statusEl.textContent = text
-  statusEl.title = text
+  statusEl.textContent = label
+  $('state').title = detail
+  if (isErr && !current && !streaming) {
+    showAnswer(`${detail}\nOuvre les Réglages → Diagnostic pour en savoir plus.`, 'error')
+    stateError = true
+  } else if (!isErr && stateError) {
+    stateError = false
+    if (!current && !streaming) showHint()
+  }
 }
+let stateError = false
 
 api.on('state', applyState)
 
 // Diagnostic : niveau audio capté (%) et morceaux reçus côté main.
-const levelEl = $('level')
-api.on('level', (l: { rms: number; an: number; received: number }) => {
-  levelEl.textContent = `♪ ${(l.rms * 100).toFixed(1)}% / ${(l.an * 100).toFixed(1)}% · ${l.received}`
+const meterBars = [...$('meter').querySelectorAll('i')]
+const STEPS_DB = [-60, -48, -40, -32, -24]
+api.on('level', (l: { rms: number; received: number }) => {
+  const db = l.rms > 0 ? 20 * Math.log10(l.rms) : -100
+  meterBars.forEach((b, i) => b.classList.toggle('on', db >= STEPS_DB[i]))
+  $('meter').title = `Son capté : ${db > -100 ? `${Math.round(db)} dB` : 'silence'} · ${l.received} blocs reçus`
 })
 
 const perfEl = $('perf')
@@ -115,7 +150,12 @@ api.on('prefs', (p: OverlayPrefsMessage) => {
 api.on('transcript:partial', (t: string) => setLive(t, true))
 api.on('transcript:committed', (t: string) => setLive(t, false))
 
+function setBusy(on: boolean): void {
+  askBtn.classList.toggle('busy', on)
+}
+
 api.on('answer:start', () => {
+  setBusy(true)
   streaming = true
   current = ''
   showAnswer('', 'loading')
@@ -125,23 +165,27 @@ api.on('answer:delta', (d: string) => {
   showAnswer(current, 'loading')
 })
 api.on('answer:done', () => {
+  setBusy(false)
   streaming = false
   previous = current
   showAnswer(current)
 })
 api.on('answer:skip', () => {
   // Claude a jugé qu'il n'y avait rien à dire : on garde l'ancienne réponse.
+  setBusy(false)
   streaming = false
   current = previous
   if (previous) showAnswer(previous)
   else showHint()
 })
 api.on('answer:error', (m: string) => {
+  setBusy(false)
   streaming = false
   current = ''
   showAnswer(m, 'error')
 })
 api.on('answer:clear', () => {
+  setBusy(false)
   streaming = false
   current = ''
   previous = ''
@@ -153,7 +197,12 @@ api.on('answer:clear', () => {
 
 $('ask').addEventListener('click', () => api.send('overlay:ask'))
 $('listen').addEventListener('click', () => api.send('overlay:toggleListening'))
-$('mode').addEventListener('click', () => api.send('overlay:toggleMode'))
+modeSeg.querySelectorAll<HTMLButtonElement>('button').forEach((b) =>
+  b.addEventListener('click', () => {
+    if (!b.classList.contains('on')) api.send('overlay:toggleMode')
+  })
+)
+$('clear').addEventListener('click', () => api.send('overlay:clear'))
 $('settings').addEventListener('click', () => api.send('overlay:openSettings'))
 $('close').addEventListener('click', () => api.send('overlay:hide'))
 
