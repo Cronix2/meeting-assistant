@@ -66,6 +66,8 @@ export interface Settings {
   kbBudgetChars: number
   /** Résumer chaque fichier avec Claude à l'import (notes consultables) */
   kbAutoSummary: boolean
+  /** Chercher automatiquement les nouvelles versions (au démarrage puis toutes les 6 h) */
+  autoUpdateCheck: boolean
   /** Mixeur : détecte automatiquement les canaux SteelSeries Sonar (Game, Chat, Média, Aux) */
   mixerAutoSonar: boolean
   /** Mixeur : identifiants de sorties Windows ajoutées à la main */
@@ -289,4 +291,22 @@ export interface DataImportInfo {
   created?: number
   appVersion?: string
   summary?: { settings: boolean; profileDocs: number; bases: number; baseFiles: number; keys: boolean }
+}
+
+// ---------- Mises à jour ----------
+
+export interface UpdateState {
+  status: 'idle' | 'checking' | 'uptodate' | 'available' | 'downloading' | 'ready' | 'installing' | 'error'
+  current: string
+  /** Appli installée (sinon, mode développement : pas d'installation automatique) */
+  canInstall: boolean
+  latest?: string
+  notes?: string
+  releaseUrl?: string
+  publishedAt?: string
+  size?: number
+  progress?: number
+  received?: number
+  checkedAt?: number
+  error?: string
 }

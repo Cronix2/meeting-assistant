@@ -281,6 +281,18 @@ export const HELP: Record<string, HelpEntry> = {
     fill: "Choisis le fichier .deskassistant exporté sur l'autre PC. Une copie de sécurité est faite dans le dossier de l'appli (backups) avant de remplacer quoi que ce soit."
   },
 
+  // ----- Mises à jour -----
+  updateCard: {
+    title: 'Mettre à jour',
+    what: "L'appli regarde la dernière version publiée sur GitHub. Si elle est plus récente, tu peux la télécharger puis l'installer en un clic : l'appli se ferme, s'installe et se rouvre toute seule.",
+    fill: "L'installeur téléchargé est vérifié avec son empreinte SHA-256 publiée par GitHub ; s'il ne correspond pas, il est supprimé. Tes réglages, clés et bases sont conservés."
+  },
+  autoUpdateCheck: {
+    title: 'Vérification automatique',
+    what: 'Une vérification discrète au démarrage puis toutes les six heures. Si une version sort, un point apparaît dans le menu et un bouton dans la fenêtre de réponse.',
+    fill: 'Laisse activé. Rien ne s’installe sans que tu cliques.'
+  },
+
   // ----- Diagnostic -----
   diagState: {
     title: 'État de l’écoute',
@@ -334,6 +346,7 @@ export const TOUR: TourStep[] = [
   { page: 'fenetre', help: 'contentProtection' },
   { page: 'transfert', help: 'exportPassword' },
   { page: 'transfert', help: 'importFile' },
+  { page: 'maj', help: 'updateCard' },
   { page: 'diag', help: 'meters' },
   {
     page: 'diag',

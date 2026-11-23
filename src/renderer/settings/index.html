@@ -25,6 +25,7 @@
         <a href="#pro" data-nav="pro">Documents de travail</a>
         <a href="#fenetre" data-nav="fenetre">Fenêtre et raccourcis</a>
         <a href="#transfert" data-nav="transfert">Sauvegarde et transfert</a>
+        <a href="#maj" data-nav="maj">Mises à jour <i class="dot" id="navUpdate"></i></a>
         <a href="#diag" data-nav="diag">Diagnostic <i class="dot" id="navDiag"></i></a>
         <button type="button" id="tourStart" class="tour-btn">Visite guidée</button>
       </nav>
@@ -63,6 +64,14 @@
               <a class="go" href="#reponses">Préciser</a>
             </li>
           </ol>
+
+          <div class="update-banner" id="homeUpdate" hidden>
+            <div>
+              <b id="homeUpdateTitle"></b>
+              <p>Une nouvelle version est prête à être installée depuis l'appli.</p>
+            </div>
+            <a class="btnlink" href="#maj">Voir la mise à jour</a>
+          </div>
 
           <div class="tour-card">
             <div>
@@ -581,6 +590,47 @@
               <p class="hint" id="importMsg"></p>
             </li>
           </ol>
+        </section>
+
+        <!-- ============ Mises à jour ============ -->
+        <section class="page" id="page-maj" data-page="maj" hidden>
+          <header class="page-head">
+            <h1>Mises à jour</h1>
+            <p>Installe la dernière version publiée sur GitHub sans quitter l'appli. Tes données sont conservées.</p>
+          </header>
+
+          <div class="update-card" id="updCard" data-help="updateCard">
+            <div class="upd-head">
+              <div>
+                <p class="upd-ver">Version installée : <b id="updCurrent">…</b></p>
+                <p class="upd-status" id="updStatus">Pas encore vérifié.</p>
+              </div>
+              <span class="upd-badge" id="updBadge" hidden></span>
+            </div>
+            <div class="progress" id="updProgressBox" hidden><i id="updBar"></i></div>
+            <p class="hint" id="updProgressText"></p>
+            <div class="btnrow">
+              <button type="button" id="updCheck" class="secondary">Rechercher une mise à jour</button>
+              <button type="button" id="updDownload" hidden>Télécharger la mise à jour</button>
+              <button type="button" id="updInstall" hidden>Installer et redémarrer</button>
+              <button type="button" id="updCancel" class="link" hidden>Annuler</button>
+              <a id="updPage" href="#" target="_blank" class="link-ext" hidden>Voir sur GitHub</a>
+            </div>
+            <p class="callout warn" id="updError" hidden></p>
+          </div>
+
+          <div class="field" id="updNotesBox" hidden>
+            <h2 class="sub">Nouveautés de la version <span id="updNotesVer"></span></h2>
+            <pre id="updNotes"></pre>
+          </div>
+
+          <div class="field" data-help="autoUpdateCheck">
+            <label class="switch">
+              <input id="autoUpdateCheck" type="checkbox" />
+              <span>Vérifier automatiquement au démarrage puis toutes les 6 heures</span>
+            </label>
+            <p class="hint">Rien n'est téléchargé sans ton accord : tu es seulement prévenu.</p>
+          </div>
         </section>
 
         <!-- ============ Diagnostic ============ -->

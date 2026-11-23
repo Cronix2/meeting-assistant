@@ -137,11 +137,13 @@ let settingsWin: BrowserWindow | null = null
 export const getSettingsWindow = (): BrowserWindow | null =>
   settingsWin && !settingsWin.isDestroyed() ? settingsWin : null
 
-export function openSettingsWindow(): void {
+/** Ouvre les Réglages (éventuellement sur une page précise, ex. « maj »). */
+export function openSettingsWindow(page?: string): void {
   if (settingsWin && !settingsWin.isDestroyed()) {
     if (settingsWin.isMinimized()) settingsWin.restore()
     settingsWin.show()
     settingsWin.focus()
+    if (page) settingsWin.webContents.send('nav', page)
     return
   }
   settingsWin = new BrowserWindow({
@@ -159,5 +161,6 @@ export function openSettingsWindow(): void {
   settingsWin.on('closed', () => {
     settingsWin = null
   })
+  if (page) settingsWin.webContents.once('did-finish-load', () => settingsWin?.webContents.send('nav', page))
   void loadPage(settingsWin, 'settings')
 }

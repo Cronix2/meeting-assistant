@@ -1,4 +1,5 @@
 import type { AppState, OverlayPrefsMessage } from '../../shared/types'
+import { initTooltips } from '../shared/tooltip'
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const api = window.api
@@ -208,3 +209,14 @@ $('close').addEventListener('click', () => api.send('overlay:hide'))
 
 showHint()
 api.send('overlay:ready')
+
+// Mise à jour disponible : petit bouton qui ouvre la page « Mises à jour » des Réglages.
+const updateBtn = $<HTMLButtonElement>('update')
+api.on('update:state', (u: { status: string; latest?: string }) => {
+  const show = u.status === 'available' || u.status === 'ready'
+  updateBtn.hidden = !show
+  if (show) updateBtn.title = `Version ${u.latest} disponible : cliquer pour l'installer`
+})
+updateBtn.addEventListener('click', () => api.send('overlay:openUpdate'))
+
+initTooltips()

@@ -1,4 +1,6 @@
 import { PRESETS } from '../../shared/defaults'
+import { initTooltips } from '../shared/tooltip'
+import { confirmBox, enhanceControls } from './controls'
 import { initHelp, startTour, tourAlreadyDone } from './tour'
 import type {
   AppState,
@@ -14,6 +16,7 @@ import type {
   KbSummaryEstimate,
   KbSummaryResult,
   DataExportResult,
+  UpdateState,
   DataImportInfo,
   MixerListResult,
   RagChange,
@@ -34,7 +37,7 @@ const saveBtn = $<HTMLButtonElement>('save')
 
 // ---------- Navigation entre les pages ----------
 
-const PAGES = ['accueil', 'cles', 'ecoute', 'reponses', 'moi', 'pro', 'fenetre', 'transfert', 'diag']
+const PAGES = ['accueil', 'cles', 'ecoute', 'reponses', 'moi', 'pro', 'fenetre', 'transfert', 'maj', 'diag']
 
 function showPage(name: string): void {
   if (!PAGES.includes(name)) name = 'accueil'
@@ -56,6 +59,9 @@ document.addEventListener('click', (e) => {
   e.preventDefault()
   showPage(a.getAttribute('href')!.slice(1))
 })
+window.addEventListener('hashchange', () => showPage(location.hash.slice(1)))
+enhanceControls()
+initTooltips()
 showPage(location.hash.slice(1) || 'accueil')
 initHelp(showPage)
 $('tourStart').addEventListener('click', startTour)
@@ -81,7 +87,14 @@ const RANGE_OUT: [string, string, (v: number) => string][] = [
   ['fontSize', 'fontOut', (v) => `${v} px`]
 ]
 function syncRanges(): void {
-  for (const [inp, out, fmt] of RANGE_OUT) $(out).textContent = fmt(Number(input(inp).value))
+  for (const [inp, out, fmt] of RANGE_OUT) {
+    const el = input(inp)
+    $(out).textContent = fmt(Number(el.value))
+    // Remplissage de la piste jusqu'au curseur.
+    const min = Number(el.min) || 0
+    const max = Number(el.max) || 1
+    el.style.setProperty('--pct', `${((Number(el.value) - min) / (max - min)) * 100}%`)
+  }
 }
 for (const [inp] of RANGE_OUT) input(inp).addEventListener('input', syncRanges)
 
@@ -325,6 +338,7 @@ function fill(s: SettingsView): void {
   input('ragTopK').value = String(s.ragTopK)
   input('kbEnabled').checked = s.kbEnabled
   input('kbAutoSummary').checked = s.kbAutoSummary
+  input('autoUpdateCheck').checked = s.autoUpdateCheck
   input('kbTopK').value = String(s.kbTopK)
   input('kbBudgetChars').value = String(s.kbBudgetChars)
   input('mixerAutoSonar').checked = s.mixerAutoSonar
@@ -379,6 +393,7 @@ function collect(): SettingsPatch {
       ragTopK: Number(input('ragTopK').value),
       kbEnabled: input('kbEnabled').checked,
       kbAutoSummary: input('kbAutoSummary').checked,
+      autoUpdateCheck: input('autoUpdateCheck').checked,
       kbTopK: Number(input('kbTopK').value),
       kbBudgetChars: Number(input('kbBudgetChars').value),
       mixerAutoSonar: input('mixerAutoSonar').checked,
@@ -635,10 +650,15 @@ $('kbRename').addEventListener('click', () => {
   void window.api.invoke('kb:update', { id: cur.id, patch: { name } }).then(refreshKb)
 })
 
-$('kbDelete').addEventListener('click', () => {
+$('kbDelete').addEventListener('click', async () => {
   const cur = kbCurrentInfo()
   if (!cur) return
-  if (!window.confirm(`Supprimer la base « ${cur.name} » et tous ses fichiers indexés ? (tes fichiers d'origine ne sont pas touchés)`)) return
+  const ok = await confirmBox(`Ses fichiers indexés, ses notes et sa fiche seront effacés. Tes fichiers d'origine ne sont pas touchés.`, {
+    title: `Supprimer la base « ${cur.name} » ?`,
+    ok: 'Supprimer la base',
+    danger: true
+  })
+  if (!ok) return
   void window.api.invoke<KbInfo[]>('kb:delete', cur.id).then((l) => {
     kbList = l
     renderKb()
@@ -677,9 +697,9 @@ async function kbSummarize(id: string, name: string, ask: boolean): Promise<void
   }
   if (ask || est.approxTokens > AUTO_SUMMARY_MAX_TOKENS) {
     const k = Math.round(est.approxTokens / 1000)
-    const ok = window.confirm(
-      `Claude va résumer ${est.files} fichier(s) de « ${name} » : environ ${k} 000 tokens envoyés en ${est.calls} appel(s) (modèle des Réglages). ` +
-        'Cela consomme des crédits de ta clé Claude. Continuer ?'
+    const ok = await confirmBox(
+      `Environ ${k} 000 tokens envoyés en ${est.calls} appel(s), avec le modèle choisi dans Réponses. Cela consomme des crédits de ta clé Claude.`,
+      { title: `Résumer ${est.files} fichier(s) de « ${name} » ?`, ok: 'Résumer les fichiers' }
     )
     if (!ok) return
   }
@@ -727,10 +747,15 @@ $('kbSum').addEventListener('click', () => {
   const cur = kbCurrentInfo()
   if (cur) void kbSummarize(cur.id, cur.name, true)
 })
-$('kbSumAll').addEventListener('click', () => {
+$('kbSumAll').addEventListener('click', async () => {
   const cur = kbCurrentInfo()
   if (!cur || kbBusy) return
-  if (!window.confirm('Effacer toutes les notes de cette base puis les refaire avec Claude ?')) return
+  const ok = await confirmBox('Les notes actuelles sont effacées, puis Claude relit tous les fichiers (le coût est affiché juste après).', {
+    title: 'Refaire toutes les notes ?',
+    ok: 'Effacer et refaire',
+    danger: true
+  })
+  if (!ok) return
   void window.api.invoke<KbInfo[]>('kb:clearNotes', cur.id).then(async (l) => {
     kbList = l
     renderKb()
@@ -748,9 +773,10 @@ $('kbGen').addEventListener('click', () => {
     }
     const est = await window.api.invoke<KbBriefEstimate>('kb:estimate', cur.id)
     const k = Math.round(est.approxTokens / 1000)
-    const ok = window.confirm(
-      `Claude va lire ${est.sampled ? 'un échantillon représentatif de ' : ''}la base « ${cur.name} » : environ ${k} 000 tokens envoyés en ${est.calls} appel(s) (modèle des Réglages). ` +
-        `Cela consomme des crédits de ta clé Claude. Continuer ?${cur.brief.trim() ? '\n\nLa fiche actuelle sera remplacée.' : ''}`
+    const ok = await confirmBox(
+      `Claude va lire ${est.sampled ? 'un échantillon représentatif de ' : ''}la base : environ ${k} 000 tokens envoyés en ${est.calls} appel(s). Cela consomme des crédits de ta clé Claude.` +
+        (cur.brief.trim() ? '\n\nLa fiche actuelle sera remplacée.' : ''),
+      { title: `Générer la fiche de « ${cur.name} » ?`, ok: 'Générer la fiche' }
     )
     if (!ok) return
     kbSetBusy(true)
@@ -844,9 +870,14 @@ $('importCancel').addEventListener('click', () => {
   importFile = ''
   $('importCard').hidden = true
 })
-$('importGo').addEventListener('click', () => {
+$('importGo').addEventListener('click', async () => {
   if (!importFile) return
-  if (!window.confirm('Remplacer toutes les données de ce PC par celles du fichier ? Une copie de sécurité est faite avant, puis l’appli redémarre.')) return
+  const ok = await confirmBox('Une copie de sécurité des données actuelles est faite avant, puis l’appli redémarre.', {
+    title: 'Remplacer toutes les données de ce PC ?',
+    ok: 'Remplacer et redémarrer',
+    danger: true
+  })
+  if (!ok) return
   const btn = $<HTMLButtonElement>('importGo')
   btn.disabled = true
   void window.api
@@ -861,6 +892,74 @@ $('importGo').addEventListener('click', () => {
       setMsg('importMsg', `Import réussi${r.keys ? ', clés API comprises' : ' (pense à recoller tes clés API)'}. Redémarrage…`, 'ok')
     })
 })
+
+// ---------- Mises à jour ----------
+
+function renderUpdate(u: UpdateState): void {
+  $('updCurrent').textContent = u.current
+  const has = u.status === 'available' || u.status === 'downloading' || u.status === 'ready' || u.status === 'installing'
+  const when = u.checkedAt ? ` (vérifié à ${new Date(u.checkedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })})` : ''
+  const size = u.size ? ` · ${fmtBytes(u.size)}` : ''
+  const text: Record<UpdateState['status'], string> = {
+    idle: 'Pas encore vérifié.',
+    checking: 'Recherche en cours…',
+    uptodate: `Tu as la dernière version${when}.`,
+    available: `La version ${u.latest} est disponible${size}.`,
+    downloading: `Téléchargement de la version ${u.latest}…`,
+    ready: `Version ${u.latest} téléchargée et vérifiée. L'appli va se fermer quelques secondes pendant l'installation.`,
+    installing: 'Installation lancée : l’appli va se fermer puis se rouvrir.',
+    error: 'La dernière opération a échoué.'
+  }
+  $('updStatus').textContent = text[u.status]
+  const badge = $('updBadge')
+  badge.hidden = !has && u.status !== 'uptodate'
+  badge.textContent = has ? `v${u.latest}` : 'À jour'
+  badge.className = `upd-badge ${has ? 'new' : 'ok'}`
+
+  $<HTMLButtonElement>('updCheck').hidden = has
+  $<HTMLButtonElement>('updCheck').disabled = u.status === 'checking'
+  $<HTMLButtonElement>('updDownload').hidden = u.status !== 'available'
+  $<HTMLButtonElement>('updInstall').hidden = u.status !== 'ready'
+  $<HTMLButtonElement>('updInstall').disabled = !u.canInstall
+  $<HTMLButtonElement>('updCancel').hidden = u.status !== 'downloading'
+  const page = $<HTMLAnchorElement>('updPage')
+  page.hidden = !u.releaseUrl || !has
+  if (u.releaseUrl) page.href = u.releaseUrl
+
+  $('updProgressBox').hidden = u.status !== 'downloading'
+  $('updBar').style.width = `${Math.round((u.progress ?? 0) * 100)}%`
+  $('updProgressText').textContent =
+    u.status === 'downloading' ? `${Math.round((u.progress ?? 0) * 100)} % · ${fmtBytes(u.received ?? 0)}${u.size ? ` sur ${fmtBytes(u.size)}` : ''}` : !u.canInstall && u.status === 'ready' ? 'Mode développement : l’installation automatique n’est possible que dans la version installée.' : ''
+  const err = $('updError')
+  err.hidden = !u.error
+  err.textContent = u.error ?? ''
+
+  $('updNotesBox').hidden = !has || !u.notes
+  $('updNotesVer').textContent = u.latest ?? ''
+  $('updNotes').textContent = u.notes ?? ''
+
+  $('navUpdate').classList.toggle('on', has)
+  $('homeUpdate').hidden = !has
+  $('homeUpdateTitle').textContent = `Version ${u.latest} disponible`
+}
+
+$('updCheck').addEventListener('click', () => void window.api.invoke<UpdateState>('update:check').then(renderUpdate))
+$('updDownload').addEventListener('click', () => void window.api.invoke<UpdateState>('update:download').then(renderUpdate))
+$('updCancel').addEventListener('click', () => void window.api.invoke('update:cancel'))
+$('updInstall').addEventListener('click', async () => {
+  if (dirty) {
+    const ok = await confirmBox('Elles seront perdues si tu installes maintenant. Enregistre-les d’abord avec Ctrl+S.', {
+      title: 'Modifications non enregistrées',
+      ok: 'Installer quand même',
+      danger: true
+    })
+    if (!ok) return
+  }
+  void window.api.invoke<UpdateState>('update:install').then(renderUpdate)
+})
+window.api.on('update:state', (u: UpdateState) => renderUpdate(u))
+window.api.on('nav', (page: string) => showPage(page))
+void window.api.invoke<UpdateState>('update:get').then(renderUpdate)
 
 // ---------- Diagnostic en direct ----------
 

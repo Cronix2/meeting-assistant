@@ -1,7 +1,7 @@
 {
   "name": "desk-assistant",
   "productName": "Desk Assistant",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Écoute l'audio du bureau Windows, transcrit (ElevenLabs Scribe) et répond via Claude dans une petite fenêtre discrète.",
   "author": "Cronix2",
   "license": "UNLICENSED",

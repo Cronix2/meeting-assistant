@@ -46,6 +46,7 @@ Tous les raccourcis sont modifiables dans les Réglages.
 - **Contexte de session & jeu de rôle** : Claude repère les mises en situation (exercices, entretiens simulés) et répond comme ton personnage ; un champ « contexte » permet de le forcer.
 - **Nombres, dates et heures en toutes lettres** (désactivable).
 - **Panneau Diagnostic en direct** dans les Réglages : niveaux par sortie audio, états capture / transcription, journal.
+- **Mises à jour depuis l'appli** : vérification au démarrage puis toutes les 6 h (désactivable), bouton dans la fenêtre de réponse et dans le menu de la zone de notification ; l'installeur est téléchargé depuis la dernière release GitHub, vérifié avec l'empreinte SHA-256 publiée par GitHub, puis installé en silence et l'appli se rouvre.
 - **Sauvegarde et transfert** : toutes les données (réglages, profil, documents, bases de connaissances avec notes et fiches, et les clés API si tu veux) tiennent dans un fichier `.deskassistant` à importer sur un autre PC. Chiffrement AES-256-GCM avec mot de passe (obligatoire pour inclure les clés), copie de sécurité automatique avant import.
 - **Réglages en pages** (Accueil, Clés, Écoute, Réponses, Mon profil, Documents de travail, Fenêtre, Diagnostic), avec une **visite guidée** pas à pas et un bouton « ? » sur chaque réglage : à quoi il sert, quoi y mettre, un exemple que l'on peut insérer d'un clic. Les réglages techniques sont rangés dans « Réglages avancés ».
 - Prompt système personnalisable (presets : général, jeu de rôle, réunion, entretien, cours, traduction).

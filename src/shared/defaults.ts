@@ -84,6 +84,7 @@ export const DEFAULT_SETTINGS: Settings = {
   kbTopK: 8,
   kbBudgetChars: 12000,
   kbAutoSummary: true,
+  autoUpdateCheck: true,
   mixerAutoSonar: true,
   mixerDevices: [],
   autoListen: true,
