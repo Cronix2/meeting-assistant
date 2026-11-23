@@ -3,6 +3,7 @@ import type { Api } from '../shared/types'
 
 // Liste blanche des canaux : le renderer ne peut parler qu'à ceux-là.
 const SEND = new Set([
+  'overlay:openUpdate',
   'audio:chunk',
   'capture:status',
   'capture:level',
@@ -40,10 +41,17 @@ const INVOKE = new Set([
   'kb:brief',
   'data:export',
   'data:pickImport',
-  'data:import'
+  'data:import',
+  'update:get',
+  'update:check',
+  'update:download',
+  'update:cancel',
+  'update:install'
 ])
 const ON = new Set([
   'state',
+  'update:state',
+  'nav',
   'level',
   'log',
   'perf',

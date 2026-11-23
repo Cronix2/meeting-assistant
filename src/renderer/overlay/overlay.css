@@ -242,6 +242,38 @@ button.primary.busy svg {
   color: var(--act);
 }
 
+/* Badge « Mise à jour » : rond ambre, discret mais visible */
+button.pill-update {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(242, 181, 68, 0.16);
+  color: var(--guide);
+  box-shadow: 0 0 0 0 rgba(242, 181, 68, 0.5);
+  animation: ring 2.4s ease-out 3;
+}
+button.pill-update svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2.4;
+}
+button.pill-update:hover {
+  background: var(--guide);
+  color: #1a1408;
+}
+@keyframes ring {
+  70% {
+    box-shadow: 0 0 0 6px rgba(242, 181, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(242, 181, 68, 0);
+  }
+}
+
 /* Fenêtre étroite : on garde l'essentiel */
 @media (max-width: 400px) {
   #ask .lbl,
@@ -392,12 +424,32 @@ button.primary.busy svg {
   display: none;
 }
 
+/* Barres de défilement maison : fines, sans flèches, épaississent au survol */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--line);
-  border-radius: 4px;
+  background: #343a47;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4a5262;
+  border-width: 2px;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-button,
+::-webkit-scrollbar-corner {
+  display: none;
+  background: transparent;
+}
+::selection {
+  background: rgba(75, 139, 245, 0.35);
 }
 
 @keyframes blink {
@@ -414,4 +466,25 @@ button.primary.busy svg {
   * {
     animation: none !important;
   }
+}
+
+/* ---------- Infobulles maison ---------- */
+.ui-tip {
+  position: fixed;
+  z-index: 300;
+  max-width: 260px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #2a2e39;
+  border: 1px solid #3a404d;
+  color: #e9ebf0;
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+/* Badge de mise à jour affiché : on libère la place du libellé de statut (le point reste). */
+#bar:has(#update:not([hidden])) #status {
+  display: none;
 }

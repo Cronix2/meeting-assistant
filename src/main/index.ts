@@ -1,6 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { BrowserWindow, Menu, app, desktopCapturer, dialog, ipcMain, session } from 'electron'
+import { BrowserWindow, Menu, app, desktopCapturer, dialog, ipcMain, net, session } from 'electron'
 import type {
   AppState,
   AudioDevice,
@@ -14,6 +14,7 @@ import type {
   KbSummaryEstimate,
   KbSummaryResult,
   DataExportResult,
+  UpdateState,
   DataImportInfo,
   LevelMessage,
   MixerListResult,
@@ -64,6 +65,7 @@ import {
   setSecret
 } from './settings'
 import { registerShortcuts, unregisterAllShortcuts } from './shortcuts'
+import { Updater } from './updater'
 import {
   MIN_PASSWORD,
   backupData,
@@ -94,6 +96,7 @@ let tray: TrayHandle
 let chunkCount = 0 // diagnostic : morceaux audio transmis au pipeline
 let mixer: MixerCapture | null = null
 let heardDevices = new Set<string>()
+let updater: Updater
 
 // ---------- Capture de l'audio système (loopback Windows) ----------
 
@@ -126,7 +129,7 @@ async function evalInCapture<T>(code: string): Promise<T> {
 // ---------- Messages vers l'overlay ----------
 
 /** La fenêtre de réglages n'a besoin que de l'état, des niveaux et du journal (panneau Diagnostic). */
-const SETTINGS_CHANNELS = new Set(['state', 'level', 'log', 'kb:progress'])
+const SETTINGS_CHANNELS = new Set(['state', 'level', 'log', 'kb:progress', 'update:state'])
 
 function sendTo(win: BrowserWindow | null | undefined, channel: string, payload?: unknown): void {
   if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return
@@ -253,7 +256,14 @@ function commitSettings(next: Settings): void {
   pushPrefs()
   if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: settings.launchAtStartup })
   void pipeline.applySettings(prev)
-  tray.update(pipeline.state, settings.hotkeys)
+  tray.update(pipeline.state, settings.hotkeys, updateBadge())
+  if (updater && prev.autoUpdateCheck !== settings.autoUpdateCheck) updater.schedule(settings.autoUpdateCheck)
+}
+
+/** Version proposée dans le menu de la zone de notification, s'il y en a une. */
+function updateBadge(): string | undefined {
+  const st = updater?.snapshot
+  return st && (st.status === 'available' || st.status === 'ready') ? st.latest : undefined
 }
 
 async function handleSave(patch: SettingsPatch): Promise<SaveResult> {
@@ -303,14 +313,15 @@ async function main(): Promise<void> {
       stopMixer()
       await runInCapture('window.stopCapture()')
     },
-    onStateChange: (state: AppState) => tray?.update(state, settings.hotkeys)
+    onStateChange: (state: AppState) => tray?.update(state, settings.hotkeys, updateBadge())
   })
 
   tray = createTray({
     toggleOverlay: () => toggleOverlay(overlayWin),
     toggleListening: () => void pipeline.toggleListening(),
     setMode: (mode) => commitSettings({ ...settings, mode }),
-    openSettings: openSettingsWindow,
+    openSettings: () => openSettingsWindow(),
+    openUpdate: () => openSettingsWindow('maj'),
     quit: () => app.quit()
   })
   tray.update(pipeline.state, settings.hotkeys)
@@ -327,6 +338,20 @@ async function main(): Promise<void> {
 
   if (!settings.startHidden) showOverlay(overlayWin)
   if (settings.autoListen) void pipeline.start()
+
+  updater = new Updater({
+    currentVersion: app.getVersion(),
+    canInstall: app.isPackaged,
+    emit: (st) => {
+      send('update:state', st)
+      tray.update(pipeline.state, settings.hotkeys, st.status === 'available' || st.status === 'ready' ? st.latest : undefined)
+    },
+    log,
+    quit: () => app.quit(),
+    // Pile réseau de Chromium : respecte le proxy système de Windows.
+    fetchImpl: ((input: string, init?: RequestInit) => net.fetch(input, init)) as unknown as typeof fetch
+  })
+  updater.schedule(settings.autoUpdateCheck)
 }
 
 function registerIpc(): void {
@@ -381,6 +406,7 @@ function registerIpc(): void {
       commitSettings({ ...settings, mode: settings.mode === 'auto' ? 'manual' : 'auto' })
   )
   ipcMain.on('overlay:openSettings', (e) => fromOverlay(e) && openSettingsWindow())
+  ipcMain.on('overlay:openUpdate', (e) => fromOverlay(e) && openSettingsWindow('maj'))
   ipcMain.on('overlay:hide', (e) => fromOverlay(e) && overlayWin.hide())
 
   ipcMain.handle('devices:list', async (): Promise<AudioDevice[]> => {
@@ -421,6 +447,11 @@ function registerIpc(): void {
   registerTransferIpc()
   ipcMain.handle('settings:get', (): SettingsView => currentView())
   ipcMain.handle('settings:save', (_e, patch: SettingsPatch) => handleSave(patch))
+  ipcMain.handle('update:get', (): UpdateState => updater.snapshot)
+  ipcMain.handle('update:check', (): Promise<UpdateState> => updater.check(false))
+  ipcMain.handle('update:download', (): Promise<UpdateState> => updater.download())
+  ipcMain.handle('update:cancel', (): void => updater.cancel())
+  ipcMain.handle('update:install', (): UpdateState => updater.install())
 }
 
 // ---------- Mémoire professionnelle (bases de connaissances) ----------

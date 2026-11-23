@@ -7,11 +7,12 @@ export interface TrayActions {
   toggleListening(): void
   setMode(mode: Mode): void
   openSettings(): void
+  openUpdate(): void
   quit(): void
 }
 
 export interface TrayHandle {
-  update(state: AppState, hotkeys: Hotkeys): void
+  update(state: AppState, hotkeys: Hotkeys, updateVersion?: string): void
   destroy(): void
 }
 
@@ -23,7 +24,7 @@ export function createTray(actions: TrayActions): TrayHandle {
   tray.on('click', () => actions.toggleOverlay())
 
   return {
-    update(state, hotkeys) {
+    update(state, hotkeys, updateVersion) {
       tray.setToolTip(
         `Desk Assistant — ${state.listening ? 'à l’écoute' : 'en pause'} (${state.mode === 'auto' ? 'auto' : 'manuel'})`
       )
@@ -48,6 +49,9 @@ export function createTray(actions: TrayActions): TrayHandle {
             click: () => actions.setMode('auto')
           },
           { type: 'separator' },
+          ...(updateVersion
+            ? [{ label: `Mettre à jour vers la version ${updateVersion}…`, click: actions.openUpdate }]
+            : []),
           { label: 'Réglages…', click: actions.openSettings },
           { label: 'Quitter', click: actions.quit }
         ])
